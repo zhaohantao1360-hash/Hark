@@ -395,7 +395,7 @@ function buildSmall(S) {
     children: [
       row([icon('ticket.fill', g.fColor, 11), T(g.name, 12, C.text, 'semibold', { minScale: 1 }), { type: 'spacer' }, T(`${L.issue.slice(-3)}期`, 10, C.dim, 'medium', { minScale: 1 })]),
       { type: 'spacer' },
-      { type: 'stack', direction: 'column', alignItems: 'center', gap: 4, children: rows.map(r => row(r.map(([x, c]) => ball(x, c, size)), { gap: 4 })) },
+      { type: 'stack', direction: 'column', alignItems: 'center', gap: 4, children: rows.map(r => row([{ type: 'spacer' }, ...r.map(([x, c]) => ball(x, c, size)), { type: 'spacer' }], { gap: 4 })) },
       { type: 'spacer' },
       poolText(S),
       S.nd ? T(`下期 ${WEEK[S.nd.getDay()]} · ${fmtCountdown(S.nd, S.now)}后`, 9, C.dim, 'semibold') : T('', 9, C.dim),
@@ -408,11 +408,14 @@ function buildMedium(S) {
   const size = fitBall(n, 300, 32, 6), small = fitBall(n, 230, 19, 4);
   const p = S.picks[0];
   return {
-    type: 'widget', padding: [11, 12], gap: 7, backgroundGradient: bg(), refreshAfter: refreshAfter(S),
+    type: 'widget', padding: [11, 12], gap: 4, backgroundGradient: bg(), refreshAfter: refreshAfter(S),
     children: [
       header(S),
+      { type: 'spacer' },
       row([{ type: 'spacer' }, ballsRow(g, L.front, L.back, size, 6), { type: 'spacer' }]),
+      { type: 'spacer' },
       row([T('参考', 10, C.dim, 'medium', { minScale: 1 }), ballsRow(g, p.front, p.back, small, 4, true), { type: 'spacer' }, poolText(S)], { gap: 6 }),
+      { type: 'spacer' },
       glass([
         row([drawCountdown(S), { type: 'spacer' }, T(S.A ? `近${S.A.N}期` : '', 10, C.dim, 'medium', { minScale: 1 })]),
         hotColdLine(S),
@@ -423,7 +426,7 @@ function buildMedium(S) {
 
 function buildLarge(S) {
   const L = S.latest, g = S.g, A = S.A, n = L.front.length + L.back.length;
-  const size = fitBall(n, 310, 34, 7), small = fitBall(n, 240, 22, 5), chip = 18;
+  const size = fitBall(n, 310, 36, 7), small = fitBall(n, 260, 24, 6), chip = 20;
   const panel = [];
   if (A) {
     let hotBalls, coldBalls, hotLbl, coldLbl;
@@ -454,20 +457,22 @@ function buildLarge(S) {
     panel.push(T(`走势数据累计中（${S.N} 期），开奖几期后自动出现`, 10, C.dim, 'medium', { maxLines: 2 }));
   }
   return {
-    type: 'widget', padding: 14, gap: 8, backgroundGradient: bg(), refreshAfter: refreshAfter(S),
+    type: 'widget', padding: 14, gap: 6, backgroundGradient: bg(), refreshAfter: refreshAfter(S),
     children: [
       header(S, 14),
+      { type: 'spacer' },
       row([{ type: 'spacer' }, ballsRow(g, L.front, L.back, size, 7), { type: 'spacer' }]),
       row([drawCountdown(S), { type: 'spacer' }, poolText(S)]),
+      { type: 'spacer' },
       glass([
         row([icon('chart.bar.fill', C.gold, 10), T(A ? `近 ${A.N} 期走势` : '走势', 10, C.dim, 'semibold', { minScale: 1 }), { type: 'spacer' }]),
         ...panel,
       ], { gap: 6, padding: [8, 12] }),
+      { type: 'spacer' },
       glass([
         row([icon('sparkles', C.gold, 10), T(`第${S.nextIssue.slice(-3)}期参考号`, 10, C.dim, 'semibold', { minScale: 1 }), { type: 'spacer' }, T('仅供娱乐 · 开奖完全随机', 9, C.dim, 'regular', { minScale: 1 })]),
-        ...S.picks.map(p => row([ballsRow(g, p.front, p.back, small, 5, true), { type: 'spacer' }])),
+        ...S.picks.map(p => row([{ type: 'spacer' }, ballsRow(g, p.front, p.back, small, 6, true), { type: 'spacer' }])),
       ], { gap: 6, padding: [8, 12] }),
-      { type: 'spacer' },
     ],
   };
 }
