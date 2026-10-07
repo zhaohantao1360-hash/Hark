@@ -1,0 +1,19 @@
+name: 彩票开奖（Hark 仪表盘版）
+description: 最新开奖、奖池、下期倒计时，近 N 期冷热号 / 遗漏 / 奇偶大小 / 和值走势，加权参考号（仅供娱乐）。基于 IBL3ND Lottery-Widget 改版
+env_schema:
+  彩票类型:
+    name: 彩票类型
+    description: 双色球 / 大乐透 / 七乐彩 / 七星彩 / 排列三 / 排列五 / 福彩3D
+    default_value: 双色球
+  分析期数:
+    name: 分析期数
+    description: 走势统计的期数，10–100
+    default_value: '50'
+scriptings:
+- generic:
+    name: 彩票-Hark
+    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/Lottery-hark.js
+    timeout: 30
+widgets:
+- name: 彩票-Hark
+  script_name: 彩票-Hark
