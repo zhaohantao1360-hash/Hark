@@ -869,7 +869,7 @@ function metricCard(icon, color, data, opts) {
       { type: 'image', src: `sf-symbol:${icon}`, width: o.icon || 20, height: o.icon || 20, color },
       { type: 'text', text: d.title, font: { size: 'caption1', weight: 'medium' }, textColor: color, maxLines: 1, minScale: 0.7 },
       { type: 'text', text: String(d.number), font: { size: o.valueSize || 'headline', weight: 'bold' }, textColor: o.valueColor || TXT, maxLines: 1, minScale: 0.5 },
-      { type: 'text', text: o.big && pct ? `${d.unit} · 剩 ${pct}` : (d.unit || ' '), font: { size: 'caption2' }, textColor: SUB, maxLines: 1 },
+      { type: 'text', text: o.big && pct && !o.noPct ? `${d.unit} · 剩 ${pct}` : (d.unit || ' '), font: { size: 'caption2' }, textColor: SUB, maxLines: 1 },
       ...(showBar ? [{ type: 'image', src: barSvg(d.percent, color, barW, 3), width: barW, height: 3 }] : []),
     ],
   };
@@ -877,7 +877,10 @@ function metricCard(icon, color, data, opts) {
 
 function feeCard(ds, opts) {
   const low = isLowFee(ds);
-  return metricCard(FEE_ICON, low ? WARN : C_FEE, feeData(ds), Object.assign({ bar: false }, opts, low ? { valueColor: WARN } : {}));
+  // 与其他三张卡保持同一结构：同样带进度条（话费无总量，正常时满格，低于 10 元按 /10 比例并变红）
+  const n = parseFloat(ds.fee.number);
+  const d = Object.assign({}, feeData(ds), { percent: low && Number.isFinite(n) ? Math.max(0, n / 10) : 1 });
+  return metricCard(FEE_ICON, low ? WARN : C_FEE, d, Object.assign({ noPct: true }, opts, low ? { valueColor: WARN } : {}));
 }
 
 function buildSmall(title, ds, fromCache) {
