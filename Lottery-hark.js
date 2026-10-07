@@ -163,6 +163,18 @@ function analyze(g, draws) {
     res.span = Math.max(...last) - Math.min(...last);
     res.sums = draws.slice(0, 12).map(d => d.front.reduce((a, x) => a + Number(x), 0)).reverse();
     res.avgSum = Math.round(draws.reduce((a, d) => a + d.front.reduce((s, x) => s + Number(x), 0), 0) / N);
+    // 区间分布（三等分）
+    const z3 = n => Math.min(2, Math.floor((n - 1) / (g.fMax / 3)));
+    res.zones = [0, 0, 0]; last.forEach(n => res.zones[z3(n)]++);
+    // 重号（与上一期相同）、连号
+    const prev = draws[1] ? draws[1].front.map(Number) : [];
+    res.repeat = last.filter(n => prev.includes(n)).length;
+    const srt = last.slice().sort((a, b) => a - b);
+    res.consec = []; for (let i = 1; i < srt.length; i++) if (srt[i] - srt[i - 1] === 1) res.consec.push(`${pad2(srt[i - 1])}-${pad2(srt[i])}`);
+    // 回补：遗漏超过平均间隔 1.5 倍
+    const gapAvg = g.fMax / g.front;
+    res.due = res.f.cold.filter(n => res.f.miss[n] >= gapAvg * 1.5).slice(0, 4);
+    res.gapAvg = Math.round(gapAvg);
   } else {
     // 每位 0–9 的频率与遗漏
     res.pos = Array.from({ length: g.front }, (_, p) => {
@@ -182,7 +194,15 @@ function analyze(g, draws) {
     res.big = last.filter(n => n >= 5).length;
     res.sums = draws.slice(0, 12).map(d => d.front.reduce((a, x) => a + Number(x), 0)).reverse();
     res.avgSum = Math.round(draws.reduce((a, d) => a + d.front.reduce((s, x) => s + Number(x), 0), 0) / N);
+    const prev = draws[1] ? draws[1].front.map(Number) : [];
+    res.repeat = last.filter((n, i) => prev[i] === n).length;
+    res.due = res.coldD.filter(d => miss[d] >= 4).slice(0, 3);
   }
+  // 和值波动 & 最常见奇偶
+  const sumsAll = draws.map(d => d.front.reduce((a, x) => a + Number(x), 0));
+  res.sd = Math.sqrt(sumsAll.reduce((a, v) => a + (v - res.avgSum) ** 2, 0) / N);
+  const oc = {}; draws.forEach(d => { const o = d.front.filter(x => Number(x) % 2).length; oc[o] = (oc[o] || 0) + 1; });
+  res.oddTop = Object.keys(oc).map(Number).sort((a, b) => oc[b] - oc[a]).slice(0, 2);
   return res;
 }
 
@@ -230,6 +250,47 @@ function suggest(g, A, seed) {
     return String(weightedPick(rand, range(0, 9), range(0, 9).map(d => 1 + 1.4 * p.freq[d] / fm + 0.8 * p.miss[d] / mm), 1)[0]);
   });
   return { front, back: g.back ? [String(Math.floor(rand() * (g.bMax + 1)))] : [] };
+}
+// 过滤：奇偶落在历史最常见的两种、和值在均值 ±1 个标准差、号码池三区都不为空
+function suggestFiltered(g, A, seed) {
+  if (!A) return suggest(g, A, seed);
+  let first = null;
+  for (let k = 0; k < 120; k++) {
+    const p = suggest(g, A, k ? `${seed}#${k}` : seed);
+    if (!first) first = p;
+    const f = p.front.map(Number);
+    const odd = f.filter(n => n % 2).length, sum = f.reduce((a, b) => a + b, 0);
+    if (!A.oddTop.includes(odd)) continue;
+    if (Math.abs(sum - A.avgSum) > Math.max(1, A.sd)) continue;
+    if (g.kind === 'pool') {
+      const z = [0, 0, 0]; f.forEach(n => z[Math.min(2, Math.floor((n - 1) / (g.fMax / 3)))]++);
+      if (z.includes(0)) continue;
+    }
+    return p;
+  }
+  return first;
+}
+// 回测：用每期之前的数据生成参考号，与该期实际号码比对
+function backtest(g, type, hist, N, K) {
+  const out = [];
+  for (let i = 0; i < K && i + 10 < hist.length; i++) {
+    const d = hist[i];
+    const A = analyze(g, hist.slice(i + 1, i + 1 + N));
+    const p = suggestFiltered(g, A, `${type}-${d.issue}-1`);
+    let fh = 0, bh = 0;
+    if (g.kind === 'pool') {
+      fh = p.front.filter(x => d.front.map(Number).includes(Number(x))).length;
+      bh = p.back.filter(x => d.back.map(Number).includes(Number(x))).length;
+    } else {
+      fh = p.front.filter((x, j) => Number(x) === Number(d.front[j])).length;
+      bh = p.back.length && d.back.length && Number(p.back[0]) === Number(d.back[0]) ? 1 : 0;
+    }
+    out.push({ issue: d.issue, fh, bh });
+  }
+  if (!out.length) return null;
+  const avg = out.reduce((a, x) => a + x.fh, 0) / out.length;
+  const exp = g.kind === 'pool' ? g.front * g.front / g.fMax : g.front / 10;
+  return { last: out[0], avg, exp, K: out.length };
 }
 const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 
@@ -302,9 +363,10 @@ async function getState(ctx) {
   const draws = hist.slice(0, N);
   const A = analyze(g, draws);
   const nextIssue = latest && latest.issue ? String(Number(latest.issue) + 1) : '';
-  const picks = [suggest(g, A, `${type}-${nextIssue}-1`), suggest(g, A, `${type}-${nextIssue}-2`)];
+  const picks = [suggestFiltered(g, A, `${type}-${nextIssue}-1`), suggestFiltered(g, A, `${type}-${nextIssue}-2`)];
+  let bt = null; try { bt = backtest(g, type, hist, N, 10); } catch (_) {}
   const nd = latest ? nextDraw(latest.frequency, latest.officeTime, now) : null;
-  return { type, g, latest, error, A, picks, nd, nextIssue, now, N: draws.length };
+  return { type, g, latest, error, A, picks, nd, nextIssue, now, N: draws.length, bt };
 }
 function mergeHist(a, b) {
   const map = new Map();
@@ -356,8 +418,15 @@ function hotColdLine(S, nHot = 3, nCold = 2) {
     T('热', 10, C.hot, 'bold', { minScale: 1 }), T(hot.join(' '), 10, C.text, 'semibold', { minScale: 1 }),
     T('冷', 10, C.cold, 'bold', { minScale: 1 }), T(cold.join(' '), 10, C.text, 'semibold', { minScale: 1 }),
     { type: 'spacer' },
-    T(`奇偶 ${A.odd}:${n - A.odd}  大小 ${A.big}:${n - A.big}`, 10, C.dim, 'medium', { minScale: 0.8 }),
+    T(A.zones ? `区间 ${A.zones.join(':')}  奇偶 ${A.odd}:${n - A.odd}` : `和值 ${A.sums[A.sums.length - 1]}  奇偶 ${A.odd}:${n - A.odd}`, 10, C.dim, 'medium', { minScale: 0.8 }),
   ]);
+}
+function btText(S, long) {
+  const b = S.bt; if (!b) return null;
+  const hit = `${b.last.fh}${S.g.back && b.last.bh != null && S.g.kind === 'pool' && !S.g.special ? '+' + b.last.bh : ''}`;
+  return long
+    ? `上期参考命中 ${hit} 个 · 近${b.K}期平均 ${b.avg.toFixed(1)} · 纯随机约 ${b.exp.toFixed(1)}`
+    : `回测 上期中${hit} · 均${b.avg.toFixed(1)}`;
 }
 function refreshAfter(S) {
   let mins = 180;
@@ -417,7 +486,7 @@ function buildMedium(S) {
       row([T('参考', 10, C.dim, 'medium', { minScale: 1 }), ballsRow(g, p.front, p.back, small, 4, true), { type: 'spacer' }, poolText(S)], { gap: 6 }),
       { type: 'spacer' },
       glass([
-        row([drawCountdown(S), { type: 'spacer' }, T(S.A ? `近${S.A.N}期` : '', 10, C.dim, 'medium', { minScale: 1 })]),
+        row([drawCountdown(S), { type: 'spacer' }, T(btText(S) || (S.A ? `近${S.A.N}期` : ''), 10, S.bt && S.bt.last.fh >= 2 ? C.gold : C.dim, 'medium', { minScale: 0.8 })]),
         hotColdLine(S),
       ], { gap: 4, padding: [6, 10], borderRadius: 12 }),
     ],
@@ -426,7 +495,7 @@ function buildMedium(S) {
 
 function buildLarge(S) {
   const L = S.latest, g = S.g, A = S.A, n = L.front.length + L.back.length;
-  const size = fitBall(n, 310, 36, 7), small = fitBall(n, 260, 24, 6), chip = 20;
+  const size = fitBall(n, 310, 32, 7), small = fitBall(n, 260, 21, 6), chip = 17;
   const panel = [];
   if (A) {
     let hotBalls, coldBalls, hotLbl, coldLbl;
@@ -444,6 +513,17 @@ function buildLarge(S) {
       row([T('冷号', 10, C.cold, 'bold', { minScale: 1 }), ...coldBalls, { type: 'spacer' }, T(coldLbl, 9, C.dim, 'medium', { minScale: 1 })], { gap: 4 }),
     );
     if (A.b) panel.push(row([T(g.name === '大乐透' ? '后区' : '蓝球', 10, g.bColor, 'bold', { minScale: 1 }), T(`热 ${A.b.hot.slice(0, 3).map(pad2).join(' ')}`, 10, C.text, 'semibold', { minScale: 1 }), T(`冷 ${A.b.cold.slice(0, 3).map(pad2).join(' ')}`, 10, C.text, 'semibold', { minScale: 1 }), { type: 'spacer' }], { gap: 8 }));
+    const extra = [];
+    if (A.zones) extra.push(`区间 ${A.zones.join(':')}`);
+    extra.push(`重号 ${A.repeat}`);
+    if (A.consec) extra.push(A.consec.length ? `连号 ${A.consec.join(' ')}` : '无连号');
+    panel.push(row([T(extra.join(' · '), 10, C.text, 'medium', { minScale: 0.8 }), { type: 'spacer' }]));
+    if (A.due && A.due.length) panel.push(row([
+      T('回补', 10, C.gold, 'bold', { minScale: 1 }),
+      T(A.due.map(x => g.kind === 'pool' ? pad2(x) : String(x)).join(' '), 10, C.text, 'semibold', { minScale: 1 }),
+      T(g.kind === 'pool' ? `遗漏超平均间隔 ${A.gapAvg} 期的 1.5 倍` : '遗漏 4 期以上', 9, C.dim, 'regular', { minScale: 0.8 }),
+      { type: 'spacer' },
+    ], { gap: 6 }));
     const bars = barsSvg(A.sums, g.fColor, 130, 26, A.avgSum);
     panel.push(row([
       { type: 'stack', direction: 'column', alignItems: 'start', gap: 2, children: [
@@ -457,7 +537,7 @@ function buildLarge(S) {
     panel.push(T(`走势数据累计中（${S.N} 期），开奖几期后自动出现`, 10, C.dim, 'medium', { maxLines: 2 }));
   }
   return {
-    type: 'widget', padding: 14, gap: 6, backgroundGradient: bg(), refreshAfter: refreshAfter(S),
+    type: 'widget', padding: [12, 14], gap: 3, backgroundGradient: bg(), refreshAfter: refreshAfter(S),
     children: [
       header(S, 14),
       { type: 'spacer' },
@@ -467,12 +547,13 @@ function buildLarge(S) {
       glass([
         row([icon('chart.bar.fill', C.gold, 10), T(A ? `近 ${A.N} 期走势` : '走势', 10, C.dim, 'semibold', { minScale: 1 }), { type: 'spacer' }]),
         ...panel,
-      ], { gap: 6, padding: [8, 12] }),
+      ], { gap: 5, padding: [7, 12] }),
       { type: 'spacer' },
       glass([
-        row([icon('sparkles', C.gold, 10), T(`第${S.nextIssue.slice(-3)}期参考号`, 10, C.dim, 'semibold', { minScale: 1 }), { type: 'spacer' }, T('仅供娱乐 · 开奖完全随机', 9, C.dim, 'regular', { minScale: 1 })]),
+        row([icon('sparkles', C.gold, 10), T(`第${S.nextIssue.slice(-3)}期参考号（已过滤）`, 10, C.dim, 'semibold', { minScale: 1 }), { type: 'spacer' }, T('仅供娱乐 · 开奖完全随机', 9, C.dim, 'regular', { minScale: 1 })]),
         ...S.picks.map(p => row([{ type: 'spacer' }, ballsRow(g, p.front, p.back, small, 6, true), { type: 'spacer' }])),
-      ], { gap: 6, padding: [8, 12] }),
+        ...(btText(S, true) ? [row([icon('checkmark.seal.fill', C.dim, 9), T(btText(S, true), 9, C.dim, 'medium', { minScale: 0.8 }), { type: 'spacer' }], { gap: 4 })] : []),
+      ], { gap: 5, padding: [7, 12] }),
     ],
   };
 }
