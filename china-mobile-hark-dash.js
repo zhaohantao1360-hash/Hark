@@ -976,7 +976,7 @@ function header(title, ds, fromCache) {
       { type: 'image', src: 'sf-symbol:antenna.radiowaves.left.and.right', width: 12, height: 12, color: C_FLOW },
       t(title, 'footnote', 'semibold'),
       { type: 'spacer' },
-      t(`${fromCache ? '缓存 · ' : ''}更新 ${ds && ds.updatedAt ? fmtTime(ds.updatedAt) : '--'}`, 'caption2', 'regular', SUB),
+      t(`${fromCache ? '缓存 · ' : ''}更新 ${ds && ds.updatedAt ? fmtTime(ds.updatedAt) : '--'}`, 10, 'regular', SUB, { minScale: 1 }),
     ],
   };
 }
