@@ -841,8 +841,14 @@ function ringsSvg(values, size, stroke, gap) {
     const p = Math.max(0, Math.min(1, Number(v.pct) || 0));
     body += `<circle cx='${h}' cy='${h}' r='${r.toFixed(2)}' fill='none' stroke='${v.color}' stroke-opacity='0.22' stroke-width='${stroke}'/>`;
     if (p > 0) {
-      body += `<circle cx='${h}' cy='${h}' r='${r.toFixed(2)}' fill='none' stroke='${v.color}' stroke-width='${stroke}' stroke-linecap='round' ` +
-        `stroke-dasharray='${(c * p).toFixed(2)} ${c.toFixed(2)}' transform='rotate(-90 ${h} ${h})'/>`;
+      // 用 path 圆弧绘制进度，不依赖 stroke-dasharray
+      if (p >= 0.999) {
+        body += `<circle cx='${h}' cy='${h}' r='${r.toFixed(2)}' fill='none' stroke='${v.color}' stroke-width='${stroke}'/>`;
+      } else {
+        const a = p * 2 * Math.PI;
+        const x = (h + r * Math.sin(a)).toFixed(2), y = (h - r * Math.cos(a)).toFixed(2);
+        body += `<path d='M ${h} ${(h - r).toFixed(2)} A ${r.toFixed(2)} ${r.toFixed(2)} 0 ${p > 0.5 ? 1 : 0} 1 ${x} ${y}' fill='none' stroke='${v.color}' stroke-width='${stroke}' stroke-linecap='round'/>`;
+      }
     }
   });
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${size} ${size}'>${body}</svg>`;

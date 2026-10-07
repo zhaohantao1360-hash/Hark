@@ -451,7 +451,16 @@ function ringsSvg(values, size, stroke, gap) {
     const c = 2 * Math.PI * r;
     const p = Math.max(0, Math.min(1, Number(v.pct) || 0));
     body += `<circle cx='${h}' cy='${h}' r='${r.toFixed(2)}' fill='none' stroke='${v.color}' stroke-opacity='0.22' stroke-width='${stroke}'/>`;
-    if (p > 0) body += `<circle cx='${h}' cy='${h}' r='${r.toFixed(2)}' fill='none' stroke='${v.color}' stroke-width='${stroke}' stroke-linecap='round' stroke-dasharray='${(c * p).toFixed(2)} ${c.toFixed(2)}' transform='rotate(-90 ${h} ${h})'/>`;
+    if (p > 0) {
+      // 用 path 圆弧绘制进度，不依赖 stroke-dasharray
+      if (p >= 0.999) {
+        body += `<circle cx='${h}' cy='${h}' r='${r.toFixed(2)}' fill='none' stroke='${v.color}' stroke-width='${stroke}'/>`;
+      } else {
+        const a = p * 2 * Math.PI;
+        const x = (h + r * Math.sin(a)).toFixed(2), y = (h - r * Math.cos(a)).toFixed(2);
+        body += `<path d='M ${h} ${(h - r).toFixed(2)} A ${r.toFixed(2)} ${r.toFixed(2)} 0 ${p > 0.5 ? 1 : 0} 1 ${x} ${y}' fill='none' stroke='${v.color}' stroke-width='${stroke}' stroke-linecap='round'/>`;
+      }
+    }
   });
   return svgUri(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${size} ${size}'>${body}</svg>`);
 }
@@ -697,7 +706,7 @@ function multiMedium(ctx, list) {
       return glass([
         {
           type: 'stack', direction: 'row', alignItems: 'center', gap: 4,
-          children: [dot(st.color === C.ok ? color : st.color), T(s.name, 11, C.text, 'semibold'), { type: 'spacer' }, ...(st.color !== C.ok ? [T(st.label, 9, st.color, 'semibold')] : [])],
+          children: [dot(st.color === C.ok ? color : st.color), T(s.name, 11, C.text, 'semibold'), { type: 'spacer' }, ...(st.color !== C.ok ? [T(st.label, 9, st.color, 'semibold')] : s.nodeCount > 0 ? [icon('point.3.filled.connected.trianglepath.dotted', C.dim, 9), T(`${s.nodeCount}节点`, 9, C.dim, 'medium')] : [])],
         },
         {
           type: 'stack', direction: 'row', alignItems: 'center', gap: 4,
@@ -715,7 +724,6 @@ function multiMedium(ctx, list) {
         },
         line('arrow.down.circle.fill', `今日 ${s.today == null ? '--' : fmtBytes(s.today)} · 日均 ${daily == null ? '--' : fmtBytes(daily)}`, color),
         line('calendar', `${e == null ? '长期有效' : `到期 ${Math.max(0, e)}天`}${r ? ` · ${r.days === 0 ? '今日重置' : `重置 ${r.days}天`}` : ''}`),
-        ...(s.nodeCount > 0 ? [line('point.3.filled.connected.trianglepath.dotted', `${s.nodeCount} 个节点`)] : []),
       ], { flex: 1, gap: 4, padding: [8, 10], borderRadius: 18 });
     };
     return {
