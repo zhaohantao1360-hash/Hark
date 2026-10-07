@@ -851,7 +851,7 @@ function updatedLabel(ds, fromCache, color) {
     children.push({ type: 'text', text: '缓存 · ', font: { size: 'caption2' }, textColor: color || T2 });
   }
   children.push(ds && ds.updatedAt
-    ? { type: 'date', date: new Date(ds.updatedAt).toISOString(), format: 'relative', font: { size: 'caption2' }, textColor: color || T2, maxLines: 1, minScale: 0.7 }
+    ? { type: 'text', text: `更新 ${fmtTime(ds.updatedAt)}`, font: { size: 'caption2' }, textColor: color || T2, maxLines: 1, minScale: 0.7 }
     : { type: 'text', text: '--', font: { size: 'caption2' }, textColor: color || T2 });
   return { type: 'stack', direction: 'row', alignItems: 'center', children };
 }

@@ -820,7 +820,7 @@ function headerRow(title, ds, fromCache) {
   const right = ds && ds.updatedAt
     ? [
       ...(fromCache ? [{ type: 'text', text: '缓存 · ', font: { size: 'caption2' }, textColor: SUB }] : []),
-      { type: 'date', date: new Date(ds.updatedAt).toISOString(), format: 'relative', font: { size: 'caption2' }, textColor: SUB, maxLines: 1, minScale: 0.7 },
+      { type: 'text', text: `更新 ${fmtTime(ds.updatedAt)}`, font: { size: 'caption2' }, textColor: SUB, maxLines: 1, minScale: 0.7 },
     ]
     : [{ type: 'text', text: '--:--', font: { size: 'caption2' }, textColor: SUB }];
   return {
