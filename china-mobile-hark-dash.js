@@ -951,7 +951,7 @@ function gaugeCard(icon, color, d, fallbackTitle, opt) {
         t(data.unit || '', 9, 'semibold', SUB, { minScale: 1 }),
       ],
     },
-  ], { flex: 1, alignItems: 'center', gap: 2, padding: [7, 4], borderRadius: 16 });
+  ], { flex: 1, alignItems: 'center', gap: 2, padding: [7, 4], borderRadius: 16, ...(o.height ? { height: o.height } : {}) });
 }
 
 function ringValues(ds) {
@@ -1048,6 +1048,7 @@ function feeCard(ds, ins, size, extra) {
       children: [t('¥', 11, 'semibold', low ? WARN : SUB, { minScale: 1 }), t(ds.fee.number, size || 22, 'bold', low ? WARN : TXT, { minScale: 0.6 })],
     },
     t(`本月剩 ${ins.daysLeft} 天`, 9, 'medium', SUB, { minScale: 1 }),
+    ...(extra && extra.alignItems === 'center' ? [{ type: 'spacer' }] : []),
   ], Object.assign({ gap: 2, padding: [7, 9], borderRadius: 16 }, extra || {}));
 }
 
@@ -1124,10 +1125,10 @@ function buildMedium(title, ds, fromCache, ctx) {
       {
         type: 'stack', direction: 'row', alignItems: 'center', gap: 6, flex: 1,
         children: [
-          feeCard(ds, ins, 21, { width: 84, height: 86 }),
-          gaugeCard('wifi', C_FLOW, ds.flow, '剩余流量'),
-          gaugeCard('globe.asia.australia.fill', C_OTHER, ds.otherFlow, '其他流量'),
-          gaugeCard('phone.fill', C_VOICE, ds.voice, '剩余语音'),
+          feeCard(ds, ins, 21, { width: 84, height: 82, alignItems: 'center' }),
+          gaugeCard('wifi', C_FLOW, ds.flow, '剩余流量', { height: 82 }),
+          gaugeCard('globe.asia.australia.fill', C_OTHER, ds.otherFlow, '其他流量', { height: 82 }),
+          gaugeCard('phone.fill', C_VOICE, ds.voice, '剩余语音', { height: 82 }),
         ],
       },
       statsStrip(ins, 40),
