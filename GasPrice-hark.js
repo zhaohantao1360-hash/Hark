@@ -157,24 +157,26 @@ async function loadPrediction(ctx, provinceCode) {
     timeout: 10000
   });
   const html = await resp.text();
+  const dm = html.match(/下次油价(\d{1,2})月(\d{1,2})日24时调整/);
+  const nextMD = dm ? [Number(dm[1]), Number(dm[2])] : null;
 
   // 1. 搁浅或不作调整
   if (/预计(?:油价)?(?:搁浅|不作?调整|停滞)/.test(html)) {
-    return { flat: true };
+    return { flat: true, nextMD };
   }
 
   // 2. 主格式："目前预计上调油价780元/吨(0.59元/升-0.70元/升)" 或 单值 "(0.59元/升)"
   let m = html.match(/预计(上调|下调|上涨|下跌)(?:油价)?[\d.]+元\/吨\((\d+(?:\.\d+)?)元\/升(?:[-~至](\d+(?:\.\d+)?)元\/升)?\)/);
   // 3. 兜底格式："油价上涨0.32元/升-0.38元/升" 或 单值 "0.32元/升"
   if (!m) m = html.match(/(上涨|上调|下调|下跌)(?:油价)?(\d+(?:\.\d+)?)元\/升(?:[-~至](\d+(?:\.\d+)?)元\/升)?/);
-  if (!m) return null;
+  if (!m) return nextMD ? { none: true, nextMD } : null;
 
   const up = m[1] === '上调' || m[1] === '上涨';
   const minV = parseFloat(m[2]);
   const maxV = m[3] ? parseFloat(m[3]) : minV;
   if (!Number.isFinite(minV)) return null;
 
-  return { up, minV, maxV };
+  return { up, minV, maxV, nextMD };
 }
 
 function resolveAreaIndex(current, cityName, explicitIndex) {
@@ -228,10 +230,17 @@ const CALENDAR = {
          [10,14],[10,28],[11,11],[11,25],[12,9],[12,23]],
 };
 
-function adjustWindow(now) {
+function adjustWindow(now, override) {
   const all = [];
+  if (override) {
+    const [om, od] = override; let oy = now.getFullYear();
+    if (om < now.getMonth() + 1 - 6) oy += 1;
+    const od8 = new Date(oy, om - 1, od, 23, 59, 59);
+    if (od8 > now) all.push(od8);
+  }
   Object.keys(CALENDAR).forEach(y => CALENDAR[y].forEach(([m, d]) => all.push(new Date(Number(y), m - 1, d, 23, 59, 59))));
-  all.sort((a, b) => a - b);
+  const uniq = []; all.forEach(d => { if (!uniq.some(u => Math.abs(u - d) < 4 * 86400000 && u > now && d > now)) uniq.push(d); });
+  all.length = 0; uniq.sort((a, b) => a - b).forEach(d => all.push(d));
   const idx = all.findIndex(d => d.getTime() > now.getTime());
   if (idx < 0) return null;
   const next = all[idx];
@@ -316,7 +325,7 @@ async function getState(ctx) {
   const offsetScale = toNumber(getEnv(env, ['OFFSET_SCALE', 'offset_scale'], '1'), 1);
   const cacheKey = `gas.hark.v1.${provinceCode}.${cityName}`;
   const now = new Date();
-  const win = adjustWindow(now);
+  let win = adjustWindow(now);
 
   let state = null, error = null;
   try {
@@ -344,10 +353,14 @@ async function getState(ctx) {
       const abs = offs.map(Math.abs), lo = Math.min(...abs).toFixed(2), hi = Math.max(...abs).toFixed(2);
       trend = { label: '上次', text: `${up ? '↑' : '↓'} ${lo === hi ? lo : `${lo}-${hi}`} 元/升`, color: up ? C.up : C.down };
     }
-    if (win && win.urgent && !error) {
+    if (!error) {
       try {
         const pr = await loadPrediction(ctx, provinceCode);
-        if (pr && pr.flat) trend = { label: '预测', text: '搁浅 / 不调整', color: C.dim };
+        if (pr && pr.nextMD) win = adjustWindow(now, pr.nextMD) || win;
+        if (pr && !pr.none && !pr.flat) state.pred = { up: pr.up, minV: pr.minV, maxV: pr.maxV };
+        else state.pred = pr && pr.flat ? { flat: true } : null;
+        if (pr && pr.none) {}
+        else if (pr && pr.flat) trend = { label: '预测', text: '搁浅 / 不调整', color: C.dim };
         else if (pr) {
           const r = pr.minV === pr.maxV ? pr.minV.toFixed(2) : `${pr.minV.toFixed(2)}-${pr.maxV.toFixed(2)}`;
           trend = { label: '预测', text: `${pr.up ? '↑' : '↓'} ${r} 元/升`, color: pr.up ? C.up : C.down };
@@ -360,7 +373,7 @@ async function getState(ctx) {
   const my = FUELS.find(x => x.id === myId || (myId.includes('柴') && x.id === '柴油')) || FUELS[0];
   const tank = Math.max(1, toNumber(getEnv(env, ['TANK_L'], '50'), 50));
   const title = getEnv(env, ['TITLE'], `${cityName || '全国'}油价`);
-  return { state, error, win, trend, my, tank, title, now };
+  return { state, error, win, trend, my, tank, title, now, cityName };
 }
 
 function tankInfo(S) {
@@ -409,9 +422,18 @@ function countdownRow(S, barW, short) {
   ], { gap: 5 });
 }
 
-function tankRow(S) {
+function tankRow(S, preferPred) {
   const tk = tankInfo(S);
   if (!tk) return T('', 10, C.dim);
+  const pr = S.state && S.state.pred;
+  if (preferPred && pr && !pr.flat) {
+    const lo = (pr.minV * S.tank).toFixed(1), hi = (pr.maxV * S.tank).toFixed(1);
+    return row([
+      icon('drop.fill', S.my.hex, 10),
+      T(`${S.my.label}加满 ${S.tank}L ¥${tk.full.toFixed(1)}`, 10, C.text, 'medium', { minScale: 1 }),
+      T(`· 下轮预计${pr.up ? '多花' : '省'} ¥${lo === hi ? lo : lo + '-' + hi}`, 10, pr.up ? C.up : C.down, 'medium', { minScale: 0.8 }),
+    ]);
+  }
   const diff = tk.diff ? `${tk.diff > 0 ? '多花' : '省'} ¥${Math.abs(tk.diff).toFixed(1)}` : '与上次持平';
   return row([
     icon('drop.fill', S.my.hex, 10),
@@ -461,7 +483,7 @@ function buildMedium(S) {
       row(FUELS.map(f => priceCard(S, f, o)), { gap: 6 }),
       glass([
         row([countdownRow(S, 40, true), { type: 'spacer' }, trendRow(S, true)]),
-        tankRow(S),
+        tankRow(S, true),
       ], { gap: 4, padding: [6, 9], borderRadius: 12 }),
     ],
   };
@@ -489,6 +511,7 @@ function buildLarge(S) {
         row([icon('drop.fill', S.my.hex, 10), T(`加满 ${S.tank}L 约需`, 10, C.dim, 'medium', { minScale: 1 })]),
         row(tk, { gap: 4 }),
         tankRow(S),
+        ...(S.state.pred && !S.state.pred.flat ? [(() => { const r = tankRow(S, true); r.children = [r.children[0], { ...r.children[2], text: r.children[2].text.replace('· ', '') }]; return r; })()] : []),
       ], { gap: 5, padding: [9, 12], borderRadius: 14 }),
       { type: 'spacer' },
     ],
