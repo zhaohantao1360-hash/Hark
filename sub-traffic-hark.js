@@ -680,27 +680,47 @@ function multiSmall(ctx, list) {
 function multiMedium(ctx, list) {
   const shown = list.slice(0, list.length === 2 ? 2 : 3);
   if (shown.length === 2) {
-    // 两个订阅：左右两张玻璃卡，各带圆环
+    // 两个订阅：左右两张玻璃卡，每张显示全部信息
     const card = (s, i) => {
       const color = colorOf(i);
+      const st = status(s);
       if (!s.traffic) return glass([T(s.name, 12, C.text, 'semibold'), T(s.nodeCount > 0 ? `${s.nodeCount} 节点` : '读取失败', 13, C.dim, 'semibold'), T(s.error || '', 9, C.dim, 'regular', { maxLines: 2 })], { flex: 1 });
-      const p = pctLeft(s.traffic);
+      const t = s.traffic;
+      const p = pctLeft(t);
+      const daily = dailyBudget(s);
+      const e = daysUntil(t.expireAt);
+      const r = nextReset(s.resetDay);
+      const line = (iconName, txt, c) => ({
+        type: 'stack', direction: 'row', alignItems: 'center', gap: 3,
+        children: [icon(iconName, c || C.dim, 9), T(txt, 9, C.dim, 'medium', { minScale: 0.55 })],
+      });
       return glass([
-        { type: 'stack', direction: 'row', alignItems: 'center', gap: 4, children: [dot(status(s).color === C.ok ? color : status(s).color), T(s.name, 12, C.text, 'semibold')] },
         {
-          type: 'stack', direction: 'row', alignItems: 'center', gap: 6,
+          type: 'stack', direction: 'row', alignItems: 'center', gap: 4,
+          children: [dot(st.color === C.ok ? color : st.color), T(s.name, 11, C.text, 'semibold'), { type: 'spacer' }, ...(st.color !== C.ok ? [T(st.label, 9, st.color, 'semibold')] : [])],
+        },
+        {
+          type: 'stack', direction: 'row', alignItems: 'center', gap: 4,
           children: [
-            { type: 'stack', direction: 'column', alignItems: 'start', gap: 0, children: [bigRemain(s.traffic, 20), T(p == null ? '' : `剩 ${Math.round(p * 100)}%`, 10, color, 'semibold')] },
+            { type: 'stack', direction: 'column', alignItems: 'start', gap: 0, children: [bigRemain(t, 19), T(`已用 ${fmtBytes(t.used)} / ${t.unlimited ? '不限量' : fmtBytes(t.total)}`, 9, C.dim, 'regular', { minScale: 0.5 })] },
             { type: 'spacer' },
-            { type: 'image', src: ringsSvg([{ pct: p == null ? 1 : p, color }], 100, 14, 0), width: 34, height: 34 },
+            {
+              type: 'stack', direction: 'column', alignItems: 'center', gap: 0,
+              children: [
+                { type: 'image', src: ringsSvg([{ pct: p == null ? 1 : p, color }], 100, 14, 0), width: 30, height: 30 },
+                T(p == null ? '∞' : `${Math.round(p * 100)}%`, 9, color, 'bold'),
+              ],
+            },
           ],
         },
-        T(subLine(s), 9, C.dim),
-      ], { flex: 1, gap: 5, padding: 10, borderRadius: 18 });
+        line('arrow.down.circle.fill', `今日 ${s.today == null ? '--' : fmtBytes(s.today)} · 日均 ${daily == null ? '--' : fmtBytes(daily)}`, color),
+        line('calendar', `${e == null ? '长期有效' : `到期 ${Math.max(0, e)}天`}${r ? ` · ${r.days === 0 ? '今日重置' : `重置 ${r.days}天`}` : ''}`),
+        ...(s.nodeCount > 0 ? [line('point.3.filled.connected.trianglepath.dotted', `${s.nodeCount} 个节点`)] : []),
+      ], { flex: 1, gap: 4, padding: [8, 10], borderRadius: 18 });
     };
     return {
-      type: 'widget', padding: 12, gap: 8, backgroundGradient: bg(), refreshAfter: refreshAt(ctx),
-      children: [header(list, titleOf(ctx, list)), { type: 'stack', direction: 'row', gap: 8, flex: 1, children: shown.map(card) }],
+      type: 'widget', padding: 11, gap: 6, backgroundGradient: bg(), refreshAfter: refreshAt(ctx),
+      children: [header(list, titleOf(ctx, list)), { type: 'stack', direction: 'row', gap: 7, flex: 1, children: shown.map(card) }],
     };
   }
   return {
