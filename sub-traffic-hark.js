@@ -689,42 +689,45 @@ function multiSmall(ctx, list) {
 function multiMedium(ctx, list) {
   const shown = list.slice(0, list.length === 2 ? 2 : 3);
   if (shown.length === 2) {
-    // 两个订阅：左右两张玻璃卡，每张显示全部信息
+    // 两个订阅：左右两张玻璃卡，结构、字号、尺寸完全一致
+    const F = { name: 11, big: 20, small: 9 };
+    const CARD = { flex: 1, height: 104, gap: 3, padding: [8, 9], borderRadius: 16 };
+    const t9 = (txt, c, w) => T(txt, F.small, c || C.dim, w || 'medium', { minScale: 1 });
     const card = (s, i) => {
       const color = colorOf(i);
       const st = status(s);
-      if (!s.traffic) return glass([T(s.name, 12, C.text, 'semibold'), T(s.nodeCount > 0 ? `${s.nodeCount} 节点` : '读取失败', 13, C.dim, 'semibold'), T(s.error || '', 9, C.dim, 'regular', { maxLines: 2 })], { flex: 1 });
+      const right = st.color !== C.ok && s.traffic ? t9(st.label, st.color, 'semibold') : t9(s.nodeCount > 0 ? `${s.nodeCount} 节点` : '-- 节点');
+      const head = {
+        type: 'stack', direction: 'row', alignItems: 'center', gap: 4,
+        children: [dot(st.color === C.ok ? color : st.color), T(s.name, F.name, C.text, 'semibold', { minScale: 1 }), { type: 'spacer' }, right],
+      };
+      if (!s.traffic) return glass([head, { type: 'spacer' }, T('读取失败', 13, C.dim, 'semibold', { minScale: 1 }), t9(s.error || '稍后自动重试'), { type: 'spacer' }], CARD);
       const t = s.traffic;
       const p = pctLeft(t);
       const daily = dailyBudget(s);
       const e = daysUntil(t.expireAt);
       const r = nextReset(s.resetDay);
-      const line = (iconName, txt, c) => ({
-        type: 'stack', direction: 'row', alignItems: 'center', gap: 3,
-        children: [icon(iconName, c || C.dim, 9), T(txt, 9, C.dim, 'medium', { minScale: 0.55 })],
-      });
+      const b = splitBytes(t.remaining);
       return glass([
-        {
-          type: 'stack', direction: 'row', alignItems: 'center', gap: 4,
-          children: [dot(st.color === C.ok ? color : st.color), T(s.name, 11, C.text, 'semibold'), { type: 'spacer' }, ...(st.color !== C.ok ? [T(st.label, 9, st.color, 'semibold')] : s.nodeCount > 0 ? [icon('point.3.filled.connected.trianglepath.dotted', C.dim, 9), T(`${s.nodeCount}节点`, 9, C.dim, 'medium')] : [])],
-        },
+        head,
         {
           type: 'stack', direction: 'row', alignItems: 'center', gap: 4,
           children: [
-            { type: 'stack', direction: 'column', alignItems: 'start', gap: 0, children: [bigRemain(t, 19), T(`已用 ${fmtBytes(t.used)} / ${t.unlimited ? '不限量' : fmtBytes(t.total)}`, 9, C.dim, 'regular', { minScale: 0.5 })] },
-            { type: 'spacer' },
             {
-              type: 'stack', direction: 'column', alignItems: 'center', gap: 0,
+              type: 'stack', direction: 'column', alignItems: 'start', gap: 0,
               children: [
-                { type: 'image', src: ringsSvg([{ pct: p == null ? 1 : p, color }], 100, 14, 0), width: 30, height: 30 },
-                T(p == null ? '∞' : `${Math.round(p * 100)}%`, 9, color, 'bold'),
+                { type: 'stack', direction: 'row', alignItems: 'end', gap: 2, children: [T(b.n, F.big, C.text, 'bold', { minScale: 1 }), T(b.u, F.small, C.dim, 'semibold', { minScale: 1 })] },
+                t9(p == null ? '不限量' : `剩余 ${Math.round(p * 100)}%`, color, 'semibold'),
               ],
             },
+            { type: 'spacer' },
+            { type: 'image', src: ringsSvg([{ pct: p == null ? 1 : p, color }], 100, 16, 0), width: 32, height: 32 },
           ],
         },
-        line('arrow.down.circle.fill', `今日 ${s.today == null ? '--' : fmtBytes(s.today)} · 日均 ${daily == null ? '--' : fmtBytes(daily)}`, color),
-        line('calendar', `${e == null ? '长期有效' : `到期 ${Math.max(0, e)}天`}${r ? ` · ${r.days === 0 ? '今日重置' : `重置 ${r.days}天`}` : ''}`),
-      ], { flex: 1, gap: 4, padding: [8, 10], borderRadius: 18 });
+        t9(`已用 ${fmtBytes(t.used)} / ${t.unlimited ? '不限量' : fmtBytes(t.total)}`),
+        t9(`今日 ${s.today == null ? '--' : fmtBytes(s.today)} · 日均 ${daily == null ? '--' : fmtBytes(daily)}`),
+        t9(`${e == null ? '长期有效' : `到期 ${Math.max(0, e)} 天`} · ${r ? (r.days === 0 ? '今日重置' : `重置 ${r.days} 天`) : '不重置'}`),
+      ], CARD);
     };
     return {
       type: 'widget', padding: 11, gap: 6, backgroundGradient: bg(), refreshAfter: refreshAt(ctx),
