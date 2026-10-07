@@ -1,0 +1,39 @@
+name: 油价（Hark 仪表盘版）
+description: 92/95/98/柴油实时油价、调价倒计时进度条、加满一箱花费与本轮涨跌影响、临近调价预测（基于 jnlaoshu GasPrice 改版）
+env_schema:
+  PROVINCE:
+    name: 省份
+    description: 省份编码或名称，如 11 或 北京
+    default_value: '11'
+  CITY:
+    name: 城市
+    description: 显示用城市名，多区域省份也用来匹配地区
+    default_value: 北京
+  MY_FUEL:
+    name: 常加油号
+    description: 92 / 95 / 98 / 柴油，用于高亮和计算加满花费
+    default_value: '92'
+  TANK_L:
+    name: 油箱容量（升）
+    description: 用来计算加满一箱的花费
+    default_value: '50'
+  TITLE:
+    name: 标题
+    description: 留空显示「城市+油价」
+    default_value: ''
+  AREA_INDEX:
+    name: 地区索引
+    description: 可选，多区域省份手动指定
+    default_value: ''
+  OFFSET_SCALE:
+    name: 涨跌幅系数
+    description: 默认 1
+    default_value: '1'
+scriptings:
+- generic:
+    name: 油价-Hark
+    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/GasPrice-hark.js
+    timeout: 30
+widgets:
+- name: 油价-Hark
+  script_name: 油价-Hark
