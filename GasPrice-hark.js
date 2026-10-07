@@ -490,29 +490,30 @@ function buildMedium(S) {
 }
 
 function buildLarge(S) {
-  const o = { label: 12, price: 26, delta: 11, spark: true, sparkW: 100, sparkH: 24, pad: [9, 6], gap: 3 };
+  const o = { label: 11, price: 21, delta: 10, spark: true, sparkW: 80, sparkH: 16, pad: [5, 6], gap: 2, height: 88 };
   const tk = FUELS.map(fu => {
     const f = S.state.fuels[fu.key];
-    return { type: 'stack', direction: 'column', alignItems: 'center', gap: 1, flex: 1, children: [T(fu.label, 9, fu.hex, 'semibold', { minScale: 1 }), T(f && Number.isFinite(f.price) ? `¥${(f.price * S.tank).toFixed(0)}` : '--', 13, C.text, 'bold', { minScale: 0.8 })] };
+    return { type: 'stack', direction: 'column', alignItems: 'center', gap: 1, flex: 1, children: [T(fu.label, 9, fu.hex, 'semibold', { minScale: 1 }), T(f && Number.isFinite(f.price) ? `¥${(f.price * S.tank).toFixed(0)}` : '--', 12, C.text, 'bold', { minScale: 0.8 })] };
   });
+  const t = tankInfo(S), pr = S.state.pred;
+  const parts = [];
+  if (t) parts.push(T(t.diff ? `本轮${t.diff > 0 ? '多花' : '省'} ¥${Math.abs(t.diff).toFixed(1)}` : '本轮持平', 10, t.diff > 0 ? C.up : t.diff < 0 ? C.down : C.dim, 'medium', { minScale: 1 }));
+  if (pr && !pr.flat) {
+    const lo = (pr.minV * S.tank).toFixed(1), hi = (pr.maxV * S.tank).toFixed(1);
+    parts.push(T('·', 10, C.dim), T(`下轮预计${pr.up ? '多花' : '省'} ¥${lo === hi ? lo : lo + '-' + hi}`, 10, pr.up ? C.up : C.down, 'medium', { minScale: 1 }));
+  }
   return {
-    type: 'widget', padding: 14, gap: 9, backgroundGradient: bg(), refreshAfter: refreshAfter(S), url: BASE,
+    type: 'widget', padding: 14, gap: 8, backgroundGradient: bg(), refreshAfter: refreshAfter(S), url: BASE,
     children: [
       header(S, 14),
-      { type: 'stack', direction: 'column', gap: 8, children: [
-        row(FUELS.slice(0, 2).map(f => priceCard(S, f, o)), { gap: 8 }),
-        row(FUELS.slice(2).map(f => priceCard(S, f, o)), { gap: 8 }),
-      ] },
+      row(FUELS.slice(0, 2).map(f => priceCard(S, f, o)), { gap: 8 }),
+      row(FUELS.slice(2).map(f => priceCard(S, f, o)), { gap: 8 }),
       glass([
-        row([countdownRow(S, 110), { type: 'spacer' }]),
-        row([trendRow(S), { type: 'spacer' }]),
-      ], { gap: 6, padding: [9, 12], borderRadius: 14 }),
-      glass([
-        row([icon('drop.fill', S.my.hex, 10), T(`加满 ${S.tank}L 约需`, 10, C.dim, 'medium', { minScale: 1 })]),
+        row([countdownRow(S, 90), { type: 'spacer' }]),
+        row([trendRow(S), { type: 'spacer' }, icon('drop.fill', S.my.hex, 9), T(`加满 ${S.tank}L`, 10, C.dim, 'medium', { minScale: 1 })]),
         row(tk, { gap: 4 }),
-        tankRow(S),
-        ...(S.state.pred && !S.state.pred.flat ? [(() => { const r = tankRow(S, true); r.children = [r.children[0], { ...r.children[2], text: r.children[2].text.replace('· ', '') }]; return r; })()] : []),
-      ], { gap: 5, padding: [9, 12], borderRadius: 14 }),
+        row([icon('drop.fill', S.my.hex, 9), T(`${S.my.label}`, 10, C.text, 'medium', { minScale: 1 }), ...parts, { type: 'spacer' }], { gap: 3 }),
+      ], { gap: 5, padding: [8, 12], borderRadius: 14 }),
       { type: 'spacer' },
     ],
   };
