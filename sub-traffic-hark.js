@@ -151,12 +151,13 @@ function countProtocolLinks(text) {
 function countClashProxies(text) {
   const flow = text.match(/^proxies:\s*\[([\s\S]*?)\]\s*$/m);
   if (flow) { const m = flow[1].match(/name:/g); return m ? m.length : 0; }
-  const startMatch = text.match(/^proxies:\s*$/m);
+  const startMatch = text.match(/^proxies:[ \t]*(#.*)?$/m);
   if (!startMatch) return 0;
   const rest = text.slice(startMatch.index + startMatch[0].length);
-  const endMatch = rest.match(/\n[^\s#][^\n]*:/);
+  // 顶格 "- name:" 也属于 proxies 列表，只在遇到下一个顶级键时结束
+  const endMatch = rest.match(/\n[^\s#\-][^\n]*:/);
   const section = endMatch ? rest.slice(0, endMatch.index) : rest;
-  const nameMatches = section.match(/(^|[\s{,])name:\s*['"]?/g);
+  const nameMatches = section.match(/(^|\n)\s*-\s*(\{\s*)?['"]?name['"]?\s*:/g);
   return nameMatches ? nameMatches.length : 0;
 }
 
@@ -198,6 +199,7 @@ async function fetchSubscription(ctx, url, customUA) {
     customUA,
     'clash.meta',
     'clash-verge/v2.2.3',
+    'v2rayN/6.42',
     'Surge/5.0',
     'Quantumult%20X/1.5.0'
   ].filter(Boolean))];
@@ -330,6 +332,10 @@ async function loadOne(ctx, sub) {
   const ua = String(ctx.env?.SUBSCRIPTION_USER_AGENT || '').trim();
   try {
     const fetched = await fetchSubscription(ctx, sub.url, ua);
+    let prev = null;
+    try { prev = ctx.storage?.getJSON(key); } catch {}
+    // 本次没数到节点时沿用上次成功数到的节点数
+    if (!(fetched.nodeCount > 0) && prev?.nodeCount > 0) fetched.nodeCount = prev.nodeCount;
     if (fetched.traffic) {
       const result = { mode: 'live', traffic: applyPlanTotal(sub, fetched.traffic), nodeCount: fetched.nodeCount, updatedAt: Date.now() };
       ctx.storage?.setJSON(key, result);
