@@ -1,0 +1,41 @@
+name: "中国移动（Hark 仪表盘版）"
+description: "桌面/锁屏小组件：剩余话费 + 流量/其他流量/语音半圆仪表 + 近 7 天流量柱状图、今日已用、日均可用、用完预测。先在「中国移动」App 用短信验证码登录一次自动捕获参数"
+author: "Hark（基于 zhaohantao1360-hash v20 改版，iOS 液态玻璃风格 + 用量洞察）"
+
+# 需要解密中国移动 App 的 HTTPS 流量：Egern 设置里安装并信任 CA，
+# 再到 iOS「设置→通用→关于本机→证书信任设置」里打开信任
+mitm:
+  hostnames:
+    includes:
+      - client.app.coc.10086.cn
+      - 10086.online-cmcc.cn
+
+scriptings:
+  # 小组件脚本（generic）
+  - generic:
+      name: "china-mobile-hark-dash"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-dash.js"
+      timeout: 20
+      env:
+        CM_PHONENUMBER: ""           # 必填：11 位移动手机号
+        # CM_SHOW_USED_FLOW: "false" # 'true' 显示已用流量
+        # CM_TITLE: "中国移动"        # 小组件标题
+        # CM_DEBUG: "false"          # 'true' 显示调试信息
+
+  # 登录参数捕获：在「中国移动」App 用短信验证码登录一次（建议关闭指纹/面容登录），看到通知即成功
+  - http_request:
+      name: "中国移动登录捕获-Hark仪表盘"
+      match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-dash.js"
+      body_required: true
+      timeout: 10
+
+  # Cookie 刷新：从登录响应抓 Set-Cookie，保持会话有效
+  - http_response:
+      name: "中国移动Cookie捕获-Hark仪表盘"
+      match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-dash.js"
+      timeout: 10
+
+widgets:
+  - name: "china-mobile-hark-dash"
