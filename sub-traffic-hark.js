@@ -111,7 +111,7 @@ function parseBodyInfo(body) {
 // ---------------------------------------------------------------------------
 
 function base64ToString(base64) {
-  const cleaned = String(base64).replace(/[^A-Za-z0-9+/=]/g, '');
+  const cleaned = String(base64).replace(/-/g, '+').replace(/_/g, '/').replace(/[^A-Za-z0-9+/=]/g, '');
   if (!cleaned) return '';
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   let output = '';
@@ -134,20 +134,23 @@ function base64ToString(base64) {
 
 const NODE_PROTOCOLS = [
   'vmess://', 'vless://', 'trojan://', 'hysteria2://', 'hysteria://',
-  'hy2://', 'tuic://', 'ssr://', 'ss://', 'snell://'
+  'hy2://', 'tuic://', 'ssr://', 'ss://', 'snell://', 'anytls://', 'wireguard://', 'wg://', 'socks5://', 'socks://', 'http://', 'https://'
 ];
 
 function countProtocolLinks(text) {
   if (!text) return 0;
   let total = 0;
   for (const protocol of NODE_PROTOCOLS) {
-    const matches = text.match(new RegExp(`(^|[^A-Za-z])${protocol}`, 'g'));
+    const re = protocol.startsWith('http') || protocol.startsWith('socks') ? new RegExp(`^\\s*${protocol}`, 'gm') : new RegExp(`(^|[^A-Za-z])${protocol}`, 'g');
+    const matches = text.match(re);
     if (matches) total += matches.length;
   }
   return total;
 }
 
 function countClashProxies(text) {
+  const flow = text.match(/^proxies:\s*\[([\s\S]*?)\]\s*$/m);
+  if (flow) { const m = flow[1].match(/name:/g); return m ? m.length : 0; }
   const startMatch = text.match(/^proxies:\s*$/m);
   if (!startMatch) return 0;
   const rest = text.slice(startMatch.index + startMatch[0].length);
@@ -155,6 +158,16 @@ function countClashProxies(text) {
   const section = endMatch ? rest.slice(0, endMatch.index) : rest;
   const nameMatches = section.match(/(^|[\s{,])name:\s*['"]?/g);
   return nameMatches ? nameMatches.length : 0;
+}
+
+// Surge / Loon / Quantumult X 等文本格式
+function countSurgeLike(text) {
+  let n = 0;
+  const surge = text.match(/^\s*[^#;\n=]+=\s*(ss|ssr|vmess|vless|trojan|snell|tuic|hysteria2?|wireguard|anytls|socks5(-tls)?|https?)\s*,/gim);
+  if (surge) n += surge.length;
+  const qx = text.match(/^\s*(shadowsocks|vmess|vless|trojan|http|socks5)\s*=\s*[^,\n]+,/gim);
+  if (qx) n += qx.length;
+  return n;
 }
 
 function countNodes(bodyText) {
@@ -167,9 +180,13 @@ function countNodes(bodyText) {
   const clash = countClashProxies(raw);
   if (clash > 0) return clash;
 
+  const surge = countSurgeLike(raw);
+  if (surge > 0) return surge;
+
   const trimmed = raw.trim();
-  if (trimmed.length > 20 && /^[A-Za-z0-9+/=\s]+$/.test(trimmed)) {
-    const decodedCount = countProtocolLinks(base64ToString(trimmed));
+  if (trimmed.length > 20 && /^[A-Za-z0-9+/=_\-\s]+$/.test(trimmed)) {
+    const decoded = base64ToString(trimmed);
+    const decodedCount = countProtocolLinks(decoded) || countSurgeLike(decoded);
     if (decodedCount > 0) return decodedCount;
   }
 
@@ -201,6 +218,7 @@ async function fetchSubscription(ctx, url, customUA) {
 
   let bestNodeCount = 0;
   let succeeded = false;
+  let foundTraffic = null;
 
   for (const userAgent of userAgents) {
     try {
@@ -211,9 +229,12 @@ async function fetchSubscription(ctx, url, customUA) {
       });
       succeeded = true;
 
+      if (foundTraffic && bestNodeCount > 0) break;
       const direct = await extract(response);
       bestNodeCount = Math.max(bestNodeCount, direct.nodeCount);
-      if (direct.traffic) return { traffic: direct.traffic, nodeCount: bestNodeCount };
+      if (direct.traffic && !foundTraffic) foundTraffic = direct.traffic;
+      if (foundTraffic && bestNodeCount > 0) return { traffic: foundTraffic, nodeCount: bestNodeCount };
+      if (foundTraffic) continue; // 有流量但没数出节点：换个客户端 UA 再取一次正文
 
       const location = readHeader(response.headers, 'location');
       if (location && response.status >= 300 && response.status < 400) {
@@ -225,7 +246,8 @@ async function fetchSubscription(ctx, url, customUA) {
         });
         const final = await extract(redirected);
         bestNodeCount = Math.max(bestNodeCount, final.nodeCount);
-        if (final.traffic) return { traffic: final.traffic, nodeCount: bestNodeCount };
+        if (final.traffic && !foundTraffic) foundTraffic = final.traffic;
+        if (foundTraffic && bestNodeCount > 0) return { traffic: foundTraffic, nodeCount: bestNodeCount };
       }
     } catch {
       // Try the next common subscription client identity.
@@ -233,7 +255,7 @@ async function fetchSubscription(ctx, url, customUA) {
   }
 
   if (!succeeded) throw new Error('订阅请求失败，请检查链接或网络');
-  return { traffic: null, nodeCount: bestNodeCount };
+  return { traffic: foundTraffic, nodeCount: bestNodeCount };
 }
 
 
