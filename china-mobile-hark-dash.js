@@ -736,7 +736,9 @@ function parseMobile(feeData, planData, opts) {
     if (Number.isFinite(vs) && vs > 0) voice.percent = Math.max(0, Math.min(1, remain / vs));
   }
 
-  return { fee, flow, otherFlow, voice, updatedAt: Date.now() };
+  const feeOk = feeInfo && (feeInfo.realBalanceFee != null || feeInfo.curFee != null);
+  const valid = feeOk || flows.length > 0 || voices.length > 0;
+  return { fee, flow, otherFlow, voice, updatedAt: Date.now(), valid };
 }
 
 async function loadData(ctx) {
@@ -752,11 +754,23 @@ async function loadData(ctx) {
     const ds = parseMobile(feeData, planData, {
       showUsedFlow: ctx.env.CM_SHOW_USED_FLOW === 'true',
     });
+    // 接口返回 200 但内容是错误（多为登录态过期）：不覆盖缓存，回退旧数据
+    if (!ds.valid) {
+      const rc = (d) => d && (d.retCode || (d.body && d.body.retCode)) || '';
+      const rd = (d) => d && (d.retDesc || (d.body && d.body.retDesc)) || '';
+      const err = new Error(`empty ${rc(feeData)}/${rc(planData)} ${String(rd(planData) || rd(feeData)).slice(0, 40)}`);
+      err.stage = 'session';
+      throw err;
+    }
+    delete ds.valid;
     if (debug) ds.planDebug = ctx.storage.get(STORE.planDebug) || '';
     ctx.storage.setJSON(STORE.datasource, ds);
     return { configured: true, ds, fromCache: false, debug };
   } catch (e) {
-    const cached = ctx.storage.getJSON(STORE.datasource);
+    let cached = ctx.storage.getJSON(STORE.datasource);
+    // 旧版本可能把空数据写进了缓存，这种缓存不用
+    if (cached && cached.flow && cached.flow.number === '--' && cached.voice && cached.voice.number === '--') cached = null;
+    if (cached) cached.stale = (e && e.stage) === 'session' ? '登录过期' : '缓存';
     const errInfo = debug ? ` [${(e && e.stage) || '?'}:${String((e && e.message) || e).slice(0, 60)}]` : '';
     if (cached) cached.planDebug = (cached.planDebug || '') + errInfo;
     return {
@@ -976,7 +990,7 @@ function header(title, ds, fromCache) {
       { type: 'image', src: 'sf-symbol:antenna.radiowaves.left.and.right', width: 12, height: 12, color: C_FLOW },
       t(title, 'footnote', 'semibold'),
       { type: 'spacer' },
-      t(`${fromCache ? '缓存 · ' : ''}更新 ${ds && ds.updatedAt ? fmtTime(ds.updatedAt) : '--'}`, 10, 'regular', SUB, { minScale: 1 }),
+      t(`${fromCache ? ((ds && ds.stale) || '缓存') + ' · ' : ''}更新 ${ds && ds.updatedAt ? fmtTime(ds.updatedAt) : '--'}`, 10, 'regular', SUB, { minScale: 1 }),
     ],
   };
 }
@@ -1256,7 +1270,9 @@ async function handleWidget(ctx) {
       ? '解密失败：可能 App 升级了加密，请重新打开 App 抓一次'
       : r.stage === 'network'
         ? '网络请求失败，请检查网络或代理'
-        : '查询失败：打开「中国移动」App 等 10 秒，让脚本刷新 Cookie 后再试';
+        : r.stage === 'session'
+          ? '登录已过期：打开「中国移动」App 停留 10 秒刷新登录，再回桌面'
+          : '查询失败：打开「中国移动」App 等 10 秒，让脚本刷新 Cookie 后再试';
     return buildError(title, hint, r.debug ? `错误: ${r.error || ''}` : '');
   }
 
