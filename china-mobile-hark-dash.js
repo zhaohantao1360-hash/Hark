@@ -1351,5 +1351,22 @@ export default async function (ctx) {
     }
     return handleCapture(ctx);
   }
+  // 定时保活：每 20 分钟查一次，防止会话因长时间不操作被注销（410000）
+  if (ctx.env && ctx.env.CM_KEEPALIVE === 'true') return handleKeepAlive(ctx);
   return handleWidget(ctx);
+}
+
+async function handleKeepAlive(ctx) {
+  const r = await loadData(ctx);
+  const expired = r.configured && (r.stage === 'session' || !r.ds || r.fromCache);
+  dlog(ctx, `保活 ${expired ? '失败:' + (r.error || '') : '成功'}`);
+  if (expired && r.stage === 'session') {
+    const last = parseInt(ctx.storage.get('cm_expire_notify') || '0', 10);
+    if (Date.now() - last > 6 * 3600 * 1000) {
+      ctx.storage.set('cm_expire_notify', String(Date.now()));
+      ctx.notify({ title: '中国移动', body: '登录已过期，打开「中国移动」App 停留几秒即可恢复' });
+    }
+  } else if (!expired) {
+    ctx.storage.set('cm_expire_notify', '0');
+  }
 }
