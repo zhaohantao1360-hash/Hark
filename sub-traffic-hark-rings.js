@@ -800,7 +800,7 @@ function multiSmall(ctx, list) {
         type: 'stack', direction: 'row', alignItems: 'center', gap: 8,
         children: [
           { type: 'image', src: ringsSvg(shown.map((s, i) => ({ pct: s.traffic ? (pctLeft(s.traffic) ?? 1) : 0, color: colorOf(i) })), 120, 14, 3), width: 54, height: 54 },
-          { type: 'stack', direction: 'column', alignItems: 'start', gap: 0, children: [T('合计剩余', 9, C.dim, 'medium'), bigRemain({ remaining: sumRemain }, 20)] },
+          { type: 'stack', direction: 'column', alignItems: 'start', gap: 0, children: [T('合计剩余', 9, C.dim, 'medium'), bigRemain({ remaining: sumRemain }, 20), T(`今日 ${fmtBytes(shown.reduce((a, s) => a + (s.today || 0), 0))}`, 9, C.accent, 'semibold')] },
         ],
       },
       { type: 'spacer' },
@@ -972,17 +972,17 @@ function multiLarge(ctx, list) {
   const sumRemain = withT.reduce((a, s) => a + s.traffic.remaining, 0);
   const sumToday = shown.reduce((a, s) => a + (s.today || 0), 0);
   const nodes = shown.reduce((a, s) => a + (s.nodeCount || 0), 0);
-  const rowH = n >= 4 ? 50 : (n === 3 ? 56 : 62);
-  const chartH = n >= 4 ? 0 : (n === 3 ? 96 : 118);
+  const rowH = n >= 4 ? 48 : (n === 3 ? 52 : 56);
+  const chartH = n >= 4 ? 0 : (n === 3 ? 0 : 100);
   const rows = shown.map((s, i) => glass([subRow(s, i, 290, { detail: true, valueSize: n >= 4 ? 13 : 15, barH: n >= 4 ? 4 : 5 })], { padding: [9, 12], borderRadius: 16, height: rowH, gap: 0 }));
   return {
-    type: 'widget', padding: [12, 14], gap: 8, backgroundGradient: bg(), refreshAfter: refreshAt(ctx),
+    type: 'widget', padding: [12, 14], gap: 7, backgroundGradient: bg(), refreshAfter: refreshAt(ctx),
     children: [
       header(list, titleOf(ctx, list)),
       {
-        type: 'stack', direction: 'row', alignItems: 'center', gap: 14, height: n >= 4 ? 78 : 90,
+        type: 'stack', direction: 'row', alignItems: 'center', gap: 14, height: n >= 4 ? 72 : 80,
         children: [
-          { type: 'image', src: ringsSvg(shown.map((s, i) => ({ pct: s.traffic ? (pctLeft(s.traffic) ?? 1) : 0, color: colorOf(i) })), 140, n >= 4 ? 10 : 13, 3), width: n >= 4 ? 76 : 88, height: n >= 4 ? 76 : 88 },
+          { type: 'image', src: ringsSvg(shown.map((s, i) => ({ pct: s.traffic ? (pctLeft(s.traffic) ?? 1) : 0, color: colorOf(i) })), 140, n >= 4 ? 10 : 13, 3), width: n >= 4 ? 70 : 78, height: n >= 4 ? 70 : 78 },
           {
             type: 'stack', direction: 'column', alignItems: 'start', gap: 2,
             children: [
@@ -995,8 +995,7 @@ function multiLarge(ctx, list) {
         ],
       },
       ...rows,
-      ...(chartH ? [weekCard(shown, chartH)] : []),
-      { type: 'spacer' },
+      ...(chartH ? [weekCard(shown, chartH)] : [{ type: 'spacer' }]),
     ],
   };
 }
