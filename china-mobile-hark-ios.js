@@ -807,19 +807,52 @@ function insights(ctx, ds) {
   const dayKey = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
   const dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const daysLeft = dim - now.getDate() + 1;
-  const flowMB = ctx.env.CM_SHOW_USED_FLOW === 'true' ? null : toMB(ds.flow);
+  // 按 通用 + 其他流量 合计剩余统计
+  const _g = toMB(ds.flow), _o = toMB(ds.otherFlow);
+  const flowMB = ctx.env.CM_SHOW_USED_FLOW === 'true' ? null
+    : (_g == null && _o == null ? null : (_g || 0) + (_o || 0));
   let todayMB = null;
   if (flowMB != null) {
     let snap = null;
-    try { snap = ctx.storage.getJSON('cm_day_snap'); } catch (e) {}
+    try { snap = ctx.storage.getJSON('cm_ios_day_snap2'); } catch (e) {}
     // 新的一天，或流量变多（加油包/月初重置）→ 重新记起点
     if (!snap || snap.date !== dayKey || flowMB > snap.start + 1) {
       snap = { date: dayKey, start: flowMB };
-      try { ctx.storage.setJSON('cm_day_snap', snap); } catch (e) {}
+      try { ctx.storage.setJSON('cm_ios_day_snap2', snap); } catch (e) {}
     }
     todayMB = Math.max(0, snap.start - flowMB);
   }
+  // 近 7 天每日用量历史（旧 → 今天）
+  const hist = [];
+  if (todayMB != null) {
+    let h = {};
+    try { h = ctx.storage.getJSON('cm_ios_hist') || {}; } catch (e) {}
+    h[dayKey] = todayMB;
+    const keep = {};
+    for (let i = 7; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 86400000);
+      const k = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+      if (h[k] != null) keep[k] = h[k];
+      if (i <= 6) hist.push(h[k] == null ? null : h[k]);
+    }
+    try { ctx.storage.setJSON('cm_ios_hist', keep); } catch (e) {}
+  }
+  // 按近 6 天（不含今天）平均用量预测
+  let forecast = { text: '用量统计中…', color: SUB };
+  if (flowMB != null) {
+    const past = hist.slice(0, 6).filter(v => v != null && v > 0);
+    const vals = past.length ? past : (todayMB > 0 ? [todayMB] : []);
+    if (vals.length) {
+      const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const days = Math.floor(flowMB / avg);
+      forecast = days >= daysLeft
+        ? { text: days > 999 ? '按近期速度 充足' : `预计够用 ${days} 天 ✓`, color: C_VOICE }
+        : { text: `约 ${days} 天用完 · 早于月底`, color: C_FEE };
+    }
+  }
   return {
+    hist,
+    forecast,
     daysLeft,
     monthPct: (now.getDate() - 1 + now.getHours() / 24) / dim,
     todayMB,
@@ -866,6 +899,19 @@ function barSvg(pct, color, w, h) {
     `<rect width='${w}' height='${h}' rx='${r}' fill='${color}' fill-opacity='0.2'/>` +
     (fw ? `<rect width='${fw.toFixed(1)}' height='${h}' rx='${r}' fill='${color}'/>` : '') + `</svg>`;
   return 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+
+function sparkSvg(values, color, w, h) {
+  const vals = values && values.length ? values : [null, null, null, null, null, null, null];
+  const n = vals.length, gap = 3, bw = (w - gap * (n - 1)) / n;
+  const max = Math.max(1, ...vals.map(v => v || 0));
+  let body = '';
+  vals.forEach((v, i) => {
+    const bh = v ? Math.max(2, (v / max) * h) : 2;
+    const op = v == null ? 0.15 : (i === n - 1 ? 1 : 0.55);
+    body += `<rect x='${(i * (bw + gap)).toFixed(1)}' y='${(h - bh).toFixed(1)}' width='${bw.toFixed(1)}' height='${bh.toFixed(1)}' rx='${Math.min(2, bw / 2).toFixed(1)}' fill='${color}' fill-opacity='${op}'/>`;
+  });
+  return 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${w} ${h}'>${body}</svg>`);
 }
 
 function ringValues(ds) {
@@ -946,10 +992,31 @@ function glass(children, extra) {
 
 /* ---------- 尺寸 ---------- */
 
+function miniRow(icon, color, d, barW) {
+  const data = d || { title: '', number: '--', unit: '', percent: 0 };
+  return {
+    type: 'stack', direction: 'column', alignItems: 'start', gap: 2,
+    children: [
+      {
+        type: 'stack', direction: 'row', alignItems: 'center', gap: 4,
+        children: [
+          { type: 'image', src: `sf-symbol:${icon}`, width: 10, height: 10, color },
+          { type: 'spacer' },
+          t(data.number, 11, 'bold', TXT, { minScale: 0.8 }),
+          t(data.unit ? ` ${data.unit}` : '', 9, 'regular', SUB, { minScale: 1 }),
+          ...(pctText(data) ? [t(` ${pctText(data)}`, 9, 'semibold', color, { minScale: 1 })] : []),
+        ],
+      },
+      { type: 'image', src: barSvg(data.percent, color, barW + 2, 3), width: barW, height: 3 },
+    ],
+  };
+}
+
 function buildSmall(title, ds, fromCache, ctx) {
   const ins = insights(ctx, ds);
+  const other = ds.otherFlow || { title: '其他流量', number: '--', unit: '', percent: 0 };
   return {
-    type: 'widget', padding: 14, gap: 6, backgroundGradient: bg(),
+    type: 'widget', padding: 13, gap: 5, backgroundGradient: bg(),
     refreshAfter: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     children: [
       {
@@ -957,18 +1024,28 @@ function buildSmall(title, ds, fromCache, ctx) {
         children: [
           { type: 'image', src: 'sf-symbol:antenna.radiowaves.left.and.right', width: 12, height: 12, color: C_FLOW },
           t(title, 'caption1', 'semibold'),
-        ],
-      },
-      {
-        type: 'stack', direction: 'row', alignItems: 'center', gap: 8, flex: 1,
-        children: [
-          feeBig(ds, ins, 24),
           { type: 'spacer' },
-          { type: 'image', src: ringsSvg(ringValues(ds), 120, 14, 3), width: 56, height: 56 },
+          t(ds.updatedAt ? fmtTime(ds.updatedAt).slice(-5) : '--', 9, 'regular', SUB, { minScale: 1 }),
         ],
       },
-      legendRow('wifi', C_FLOW, ds.flow),
-      t(ins.todayMB != null ? `今日已用 ${fmtMB(ins.todayMB)} · ${ds.updatedAt ? fmtTime(ds.updatedAt).slice(6) : '--'}` : `更新 ${ds.updatedAt ? fmtTime(ds.updatedAt) : '--'}`, 'caption2', 'regular', SUB),
+      { type: 'spacer' },
+      {
+        type: 'stack', direction: 'row', alignItems: 'center', gap: 8,
+        children: [
+          { type: 'image', src: ringsSvg(ringValues(ds), 120, 15, 3), width: 46, height: 46 },
+          {
+            type: 'stack', direction: 'column', alignItems: 'start', gap: 0,
+            children: [
+              feeBig(ds, ins, 20),
+              t(ins.todayMB != null ? `今日 ${fmtMB(ins.todayMB)}` : `本月剩 ${ins.daysLeft} 天`, 9, 'semibold', C_FLOW, { minScale: 0.8 }),
+            ],
+          },
+        ],
+      },
+      { type: 'spacer' },
+      miniRow('wifi', C_FLOW, ds.flow, 128),
+      miniRow('globe.asia.australia.fill', C_OTHER, other, 128),
+      miniRow('phone.fill', C_VOICE, ds.voice, 128),
     ],
   };
 }
@@ -977,7 +1054,7 @@ function buildMedium(title, ds, fromCache, ctx) {
   const ins = insights(ctx, ds);
   const other = ds.otherFlow || { title: '其他流量', number: '--', unit: '' };
   return {
-    type: 'widget', padding: 14, gap: 8, backgroundGradient: bg(),
+    type: 'widget', padding: [12, 14], gap: 8, backgroundGradient: bg(),
     refreshAfter: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     children: [
       header(title, ds, fromCache),
@@ -985,9 +1062,9 @@ function buildMedium(title, ds, fromCache, ctx) {
         type: 'stack', direction: 'row', alignItems: 'center', gap: 12, flex: 1,
         children: [
           {
-            type: 'stack', direction: 'column', alignItems: 'center', gap: 6, width: 104,
+            type: 'stack', direction: 'column', alignItems: 'center', gap: 4, width: 96,
             children: [
-              { type: 'image', src: ringsSvg(ringValues(ds), 120, 13, 3), width: 76, height: 76 },
+              { type: 'image', src: ringsSvg(ringValues(ds), 120, 13, 3), width: 70, height: 70 },
               feeBig(ds, ins, 20),
             ],
           },
@@ -996,14 +1073,15 @@ function buildMedium(title, ds, fromCache, ctx) {
             legendRow('globe.asia.australia.fill', C_OTHER, other, pctText(other)),
             legendRow('phone.fill', C_VOICE, ds.voice, pctText(ds.voice)),
             {
-              type: 'stack', direction: 'row', alignItems: 'center', gap: 6,
+              type: 'stack', direction: 'row', alignItems: 'center', gap: 5,
               children: [
-                t(ins.todayMB != null ? `今日 ${fmtMB(ins.todayMB)}` : '', 'caption2', 'medium', SUB),
+                { type: 'image', src: sparkSvg(ins.hist, C_FLOW, 70, 14), width: 34, height: 10 },
+                t(ins.todayMB != null ? `今日 ${fmtMB(ins.todayMB)}` : `本月剩 ${ins.daysLeft} 天`, 9, 'semibold', TXT, { minScale: 0.8 }),
                 { type: 'spacer' },
-                t(ins.dailyMB != null ? `日均可用 ${fmtMB(ins.dailyMB)}` : '', 'caption2', 'medium', SUB),
+                t(ins.forecast.text, 9, 'semibold', ins.forecast.color, { minScale: 0.8 }),
               ],
             },
-          ], { flex: 1, gap: 7 }),
+          ], { flex: 1, gap: 7, padding: [10, 12] }),
         ],
       },
       ...(ds.planDebug ? [t(ds.planDebug, 'caption2', 'regular', SUB, { maxLines: 3 })] : []),
@@ -1017,23 +1095,34 @@ function buildLarge(title, ds, fromCache, ctx) {
   const phone = getPhone(ctx);
   const masked = /^\d{11}$/.test(phone) ? `${phone.slice(0, 3)} **** ${phone.slice(7)}` : '';
   const meter = (icon, color, d) => glass([
-    legendRow(icon, color, d, pctText(d)),
-    { type: 'image', src: barSvg(d.percent, color, 290, 6), width: 290, height: 6 },
-  ], { gap: 8, padding: [10, 12], borderRadius: 18 });
+    {
+      type: 'stack', direction: 'row', alignItems: 'center', gap: 5,
+      children: [
+        { type: 'image', src: `sf-symbol:${icon}`, width: 13, height: 13, color },
+        t(d.title, 'caption1', 'regular', SUB),
+        { type: 'spacer' },
+        t(d.number, 17, 'bold', TXT),
+        t(d.unit ? ` ${d.unit}` : '', 'caption2', 'regular', SUB),
+        ...(pctText(d) ? [t(`  ${pctText(d)}`, 'caption1', 'semibold', color)] : []),
+      ],
+    },
+    { type: 'image', src: barSvg(d.percent, color, 300, 6), width: 296, height: 6 },
+  ], { gap: 7, padding: [9, 12], borderRadius: 18, height: 54 });
   return {
-    type: 'widget', padding: 16, gap: 10, backgroundGradient: bg(),
+    type: 'widget', padding: [14, 16], gap: 8, backgroundGradient: bg(),
     refreshAfter: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     children: [
       header(title, ds, fromCache),
       {
-        type: 'stack', direction: 'row', alignItems: 'center', gap: 14,
+        type: 'stack', direction: 'row', alignItems: 'center', gap: 14, height: 88,
         children: [
-          { type: 'image', src: ringsSvg(ringValues(ds), 140, 15, 3), width: 96, height: 96 },
+          { type: 'image', src: ringsSvg(ringValues(ds), 140, 15, 3), width: 86, height: 86 },
           {
-            type: 'stack', direction: 'column', alignItems: 'start', gap: 4,
+            type: 'stack', direction: 'column', alignItems: 'start', gap: 3,
             children: [
-              feeBig(ds, ins, 34),
+              feeBig(ds, ins, 32),
               ...(masked ? [t(masked, 'caption2', 'medium', SUB, { family: 'Menlo' })] : []),
+              t(`本月还剩 ${ins.daysLeft} 天${ins.dailyMB != null ? ` · 日均可用 ${fmtMB(ins.dailyMB)}` : ''}`, 'caption2', 'semibold', C_FLOW),
             ],
           },
           { type: 'spacer' },
@@ -1042,15 +1131,24 @@ function buildLarge(title, ds, fromCache, ctx) {
       meter('wifi', C_FLOW, ds.flow),
       meter('globe.asia.australia.fill', C_OTHER, other),
       meter('phone.fill', C_VOICE, ds.voice),
+      glass([
+        {
+          type: 'stack', direction: 'row', alignItems: 'end', gap: 8,
+          children: [
+            { type: 'image', src: sparkSvg(ins.hist, C_FLOW, 140, 24), width: 110, height: 20 },
+            {
+              type: 'stack', direction: 'column', alignItems: 'start', gap: 1,
+              children: [
+                t('近 7 天 · 今日', 9, 'medium', SUB, { minScale: 1 }),
+                t(ins.todayMB != null ? fmtMB(ins.todayMB) : '--', 13, 'bold', TXT, { minScale: 1 }),
+              ],
+            },
+            { type: 'spacer' },
+            t(ins.forecast.text, 'caption2', 'semibold', ins.forecast.color),
+          ],
+        },
+      ], { padding: [8, 12], borderRadius: 16, gap: 0 }),
       { type: 'spacer' },
-      {
-        type: 'stack', direction: 'row', alignItems: 'center', gap: 6,
-        children: [
-          chip('calendar', C_FEE, `本月还剩 ${ins.daysLeft} 天`),
-          ...(ins.todayMB != null ? [chip('arrow.down.circle.fill', C_FLOW, `今日 ${fmtMB(ins.todayMB)}`)] : []),
-          ...(ins.dailyMB != null ? [chip('gauge.with.dots.needle.33percent', C_VOICE, `日均 ${fmtMB(ins.dailyMB)}`)] : []),
-        ],
-      },
       ...(ds.planDebug ? [t(ds.planDebug, 'caption2', 'regular', SUB, { maxLines: 3 })] : []),
     ],
   };
