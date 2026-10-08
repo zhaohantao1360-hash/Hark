@@ -878,7 +878,10 @@ function insights(ctx, ds) {
   const dayKey = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
   const dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const daysLeft = dim - now.getDate() + 1;
-  const flowMB = ctx.env.CM_SHOW_USED_FLOW === 'true' ? null : toMB(ds.flow);
+  // 按 通用 + 其他流量 合计剩余统计
+  const _g = toMB(ds.flow), _o = toMB(ds.otherFlow);
+  const flowMB = ctx.env.CM_SHOW_USED_FLOW === 'true' ? null
+    : (_g == null && _o == null ? null : (_g || 0) + (_o || 0));
   let todayMB = null;
   if (flowMB != null) {
     let snap = null;
