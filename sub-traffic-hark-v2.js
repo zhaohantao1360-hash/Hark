@@ -555,6 +555,26 @@ function sparkSvg(values, color, w, h) {
   return svgUri(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${w} ${h}'>${body}</svg>`);
 }
 
+// 近 7 天分组柱状图（多订阅大号用）
+function weekSvg(list, w, h) {
+  const n = 7, groupGap = 10, m = list.length || 1;
+  const gw = (w - groupGap * (n - 1)) / n;
+  const bw = Math.max(2, (gw - 2 * (m - 1)) / m);
+  const vals = list.map(s => (s.hist || [null, null, null, null, null, null, s.today]).map(v => v || 0));
+  const max = Math.max(1, ...vals.flat());
+  let body = '';
+  for (let d = 0; d < n; d++) {
+    list.forEach((s, k) => {
+      const v = vals[k][d] || 0;
+      const bh = v ? Math.max(2, (v / max) * (h - 1)) : 2;
+      const x = d * (gw + groupGap) + k * (bw + 2);
+      const op = v ? (d === n - 1 ? 1 : 0.6) : 0.15;
+      body += `<rect x='${x.toFixed(1)}' y='${(h - bh).toFixed(1)}' width='${bw.toFixed(1)}' height='${bh.toFixed(1)}' rx='${Math.min(2.5, bw / 2).toFixed(1)}' fill='${colorOf(k)}' fill-opacity='${op}'/>`;
+    });
+  }
+  return svgUri(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${w} ${h}'>${body}</svg>`);
+}
+
 function barSvg(pct, color, w, h) {
   const p = Math.max(0, Math.min(1, Number(pct) || 0));
   const r = h / 2, fw = p > 0 ? Math.max(h, w * p) : 0;
@@ -764,14 +784,20 @@ function singleLarge(ctx, s) {
 /* ---------- 多订阅 ---------- */
 
 function multiSmall(ctx, list) {
+  const shown = list.slice(0, 3);
+  const withT = shown.filter(s => s.traffic && !s.traffic.unlimited && Number.isFinite(s.traffic.remaining));
+  const sumRemain = withT.reduce((a, s) => a + s.traffic.remaining, 0);
+  const sumToday = shown.reduce((a, s) => a + (s.today || 0), 0);
+  const two = shown.length <= 2;
   return {
-    type: 'widget', padding: 14, gap: 8, backgroundGradient: bg(), refreshAfter: refreshAt(ctx),
+    type: 'widget', padding: 14, gap: two ? 7 : 8, backgroundGradient: bg(), refreshAfter: refreshAt(ctx),
     children: [
-      { type: 'stack', direction: 'row', alignItems: 'center', gap: 5, children: [icon('chart.pie.fill', C.accent, 12), T(titleOf(ctx, list), 12, C.text, 'semibold')] },
+      { type: 'stack', direction: 'row', alignItems: 'center', gap: 5, children: [icon('chart.pie.fill', C.accent, 12), T(titleOf(ctx, list), 12, C.text, 'semibold'), { type: 'spacer' }, T(lastUpdated(list), 9, C.dim)] },
+      ...(two ? [{ type: 'stack', direction: 'column', alignItems: 'start', gap: 0, children: [T('合计剩余', 9, C.dim, 'medium'), bigRemain({ remaining: sumRemain }, 24)] }] : []),
       { type: 'spacer' },
-      ...list.slice(0, 3).map((s, i) => subRow(s, i, 126, { valueSize: 12, barH: 3 })),
+      ...shown.map((s, i) => subRow(s, i, 126, { valueSize: 12, barH: 3 })),
       { type: 'spacer' },
-      T(`更新 ${lastUpdated(list)}`, 9, C.dim),
+      T(`今日已用 ${fmtBytes(sumToday)}`, 10, C.accent, 'semibold'),
     ],
   };
 }
@@ -920,17 +946,38 @@ function sumCard(shown, sumRemain, sumToday, o) {
   ], { flex: 1, height: o.height, gap: 5, padding: o.padding, borderRadius: 16 });
 }
 
+function weekCard(shown, height) {
+  const now = new Date();
+  const wk = ['日', '一', '二', '三', '四', '五', '六'];
+  const labels = [];
+  for (let i = 6; i >= 0; i--) labels.push(i === 0 ? '今' : wk[new Date(now.getTime() - i * 86400000).getDay()]);
+  const legend = shown.map((s, i) => ({ type: 'stack', direction: 'row', alignItems: 'center', gap: 3, children: [dot(colorOf(i)), T(s.name, 9, C.dim, 'medium', { minScale: 1 })] }));
+  const week = shown.reduce((a, s) => a + (s.hist || []).reduce((x, v) => x + (v || 0), 0), 0);
+  return glass([
+    {
+      type: 'stack', direction: 'row', alignItems: 'center', gap: 6,
+      children: [T('近 7 天用量', 11, C.text, 'semibold', { minScale: 1 }), T(`共 ${fmtBytes(week)}`, 10, C.accent, 'semibold', { minScale: 1 }), { type: 'spacer' }, ...legend],
+    },
+    { type: 'spacer' },
+    { type: 'image', src: weekSvg(shown, 300, 56), width: 296, height: 52 },
+    { type: 'stack', direction: 'row', gap: 0, children: labels.map((l, i) => T(l, 9, i === 6 ? C.text : C.dim, i === 6 ? 'semibold' : 'medium', { flex: 1, textAlign: 'center', minScale: 1 })) },
+  ], { height, gap: 4, padding: [9, 11], borderRadius: 16 });
+}
+
 function multiLarge(ctx, list) {
   const shown = list.slice(0, 4);
   const withT = shown.filter(s => s.traffic && !s.traffic.unlimited && Number.isFinite(s.traffic.remaining));
   const sumRemain = withT.reduce((a, s) => a + s.traffic.remaining, 0);
   const sumToday = shown.reduce((a, s) => a + (s.today || 0), 0);
   const odd = shown.length % 2 === 1;
-  const O = { height: odd ? 146 : 128, gap: odd ? 4 : 3, padding: [9, 11], name: 12, big: 22, small: 10 };
+  const two = shown.length === 2;
+  const O = { height: odd ? 146 : (two ? 140 : 128), gap: odd || two ? 4 : 3, padding: [9, 11], name: 12, big: 22, small: 10 };
   const cells = shown.map((s, i) => detailCard(s, i, O));
   if (odd) cells.push(sumCard(shown, sumRemain, sumToday, O));
   const rows = [];
-  for (let k = 0; k < cells.length; k += 2) rows.push({ type: 'stack', direction: 'row', gap: 8, children: cells.slice(k, k + 2) });
+  // 行高固定，避免 Egern 把整行撑高后卡片上下居中留白
+  for (let k = 0; k < cells.length; k += 2) rows.push({ type: 'stack', direction: 'row', alignItems: 'start', gap: 8, height: O.height, children: cells.slice(k, k + 2) });
+  if (two) rows.push(weekCard(shown, 112));
   const top = odd ? [] : [{
     type: 'stack', direction: 'row', alignItems: 'end', gap: 6,
     children: [
