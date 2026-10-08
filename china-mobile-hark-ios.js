@@ -973,6 +973,22 @@ function legendRow(icon, color, d, extra) {
   };
 }
 
+function alignedRow(icon, color, d, extra) {
+  const data = d || { title: '', number: '--', unit: '' };
+  const box = (w, child, right) => ({ type: 'stack', direction: 'row', alignItems: 'center', width: w, children: right ? [{ type: 'spacer' }, child] : [child, { type: 'spacer' }] });
+  return {
+    type: 'stack', direction: 'row', alignItems: 'center', gap: 4,
+    children: [
+      { type: 'image', src: `sf-symbol:${icon}`, width: 12, height: 12, color },
+      t(data.title, 'caption1', 'regular', SUB, { minScale: 0.8 }),
+      { type: 'spacer' },
+      box(48, t(data.number, 'subheadline', 'bold', TXT, { minScale: 0.7 }), true),
+      box(22, t(data.unit || '', 'caption2', 'regular', SUB, { minScale: 0.8 }), false),
+      box(30, t(extra || '', 'caption2', 'semibold', color, { minScale: 0.8 }), true),
+    ],
+  };
+}
+
 function pctText(d) { return d && d.percent > 0 ? `${Math.round(d.percent * 100)}%` : ''; }
 
 function chip(icon, color, text) {
@@ -1070,9 +1086,9 @@ function buildMedium(title, ds, fromCache, ctx) {
             ],
           },
           glass([
-            legendRow('wifi', C_FLOW, ds.flow, pctText(ds.flow)),
-            legendRow('globe.asia.australia.fill', C_OTHER, other, pctText(other)),
-            legendRow('phone.fill', C_VOICE, ds.voice, pctText(ds.voice)),
+            alignedRow('wifi', C_FLOW, ds.flow, pctText(ds.flow)),
+            alignedRow('globe.asia.australia.fill', C_OTHER, other, pctText(other)),
+            alignedRow('phone.fill', C_VOICE, ds.voice, pctText(ds.voice)),
             {
               type: 'stack', direction: 'row', alignItems: 'center', gap: 5,
               children: [
