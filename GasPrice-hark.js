@@ -417,7 +417,7 @@ function countdownRow(S, barW, short) {
   const c = w ? (w.urgent ? C.up : C.gold) : C.dim;
   return row([
     icon('clock.fill', c, 10),
-    T(w ? `下轮 ${short ? w.shortDate : w.dateStr}` : '下轮调价 待公布', 10, C.text, 'semibold', { minScale: 1 }),
+    T(w ? `下轮 ${short ? w.shortDate : w.dateStr}` : '下轮调价 待公布', 10, C.text, 'semibold', { minScale: 0.8 }),
     ...(w ? [{ type: 'image', src: barSvg(w.progress, c, barW, 5), width: barW, height: 5 }, T(`${w.countdown}后`, 10, c, 'semibold', { minScale: 1 })] : []),
   ], { gap: 5 });
 }
@@ -482,7 +482,7 @@ function buildMedium(S) {
       header(S),
       row(FUELS.map(f => priceCard(S, f, o)), { gap: 6 }),
       glass([
-        row([countdownRow(S, 40, true), { type: 'spacer' }, trendRow(S, true)]),
+        row([countdownRow(S, 28, true), { type: 'spacer' }, trendRow(S, true)]),
         tankRow(S, true),
       ], { gap: 4, padding: [6, 9], borderRadius: 12 }),
     ],
