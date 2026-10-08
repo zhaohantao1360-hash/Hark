@@ -1016,7 +1016,7 @@ function buildSmall(title, ds, fromCache, ctx) {
   const ins = insights(ctx, ds);
   const other = ds.otherFlow || { title: '其他流量', number: '--', unit: '', percent: 0 };
   return {
-    type: 'widget', padding: 13, gap: 5, backgroundGradient: bg(),
+    type: 'widget', padding: [12, 13], gap: 4, backgroundGradient: bg(),
     refreshAfter: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     children: [
       {
@@ -1028,18 +1028,18 @@ function buildSmall(title, ds, fromCache, ctx) {
           t(ds.updatedAt ? fmtTime(ds.updatedAt).slice(-5) : '--', 9, 'regular', SUB, { minScale: 1 }),
         ],
       },
-      { type: 'spacer' },
       {
-        type: 'stack', direction: 'row', alignItems: 'center', gap: 8,
+        type: 'stack', direction: 'row', alignItems: 'center', gap: 9,
         children: [
-          { type: 'image', src: ringsSvg(ringValues(ds), 120, 15, 3), width: 46, height: 46 },
+          { type: 'image', src: ringsSvg(ringValues(ds), 120, 15, 3), width: 56, height: 56 },
           {
-            type: 'stack', direction: 'column', alignItems: 'start', gap: 0,
+            type: 'stack', direction: 'column', alignItems: 'start', gap: 1,
             children: [
-              feeBig(ds, ins, 20),
-              t(ins.todayMB != null ? `今日 ${fmtMB(ins.todayMB)}` : `本月剩 ${ins.daysLeft} 天`, 9, 'semibold', C_FLOW, { minScale: 0.8 }),
+              feeBig(ds, ins, 24),
+              t(ins.todayMB != null ? `今日 ${fmtMB(ins.todayMB)}` : `本月剩 ${ins.daysLeft} 天`, 10, 'semibold', C_FLOW, { minScale: 0.8 }),
             ],
           },
+          { type: 'spacer' },
         ],
       },
       { type: 'spacer' },
