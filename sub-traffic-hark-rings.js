@@ -797,7 +797,7 @@ function multiSmall(ctx, list) {
       type: 'stack', direction: 'column', alignItems: 'start', gap: 2,
       children: [
         { type: 'stack', direction: 'row', alignItems: 'center', gap: 4, children: [dot(colorOf(i)), T(s.name, 10, C.text, 'semibold'), { type: 'spacer' }, T(s.traffic ? fmtBytes(s.traffic.remaining) : '失败', 10, C.text, 'bold'), ...(p != null ? [T(` ${Math.round(p * 100)}%`, 9, colorOf(i), 'semibold')] : [])] },
-        ...(n <= 3 ? [{ type: 'image', src: barSvg(p == null ? 1 : p, colorOf(i), 130, 3), width: 128, height: 3 }] : []),
+        ...(n <= 3 ? [{ type: 'image', src: barSvg(p == null ? 1 : p, colorOf(i), 146, 3), width: 144, height: 3 }] : []),
       ],
     };
   };
