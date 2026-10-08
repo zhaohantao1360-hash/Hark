@@ -325,6 +325,8 @@ const STORE = {
   loginUrl: 'cm_login_url',     // 捕获的 autoLogin URL
   cookie: 'cm_cookie',          // Cookie / Set-Cookie
   loginTs: 'cm_login_ts',
+  loginHeaders: 'cm_login_headers', // 捕获的 autoLogin 请求头（用于自动续期）
+  refreshTs: 'cm_refresh_ts',       // 上次自动续期时间
   datasource: 'cm_datasource',
   rawDebug: 'cm_raw_debug',
   planDebug: 'cm_plan_debug',
@@ -445,6 +447,16 @@ async function handleCapture(ctx) {
   ctx.storage.set(STORE.loginUrl, url);
   const cookie = String(getHeader(headers, 'cookie') || '').trim();
   if (cookie) ctx.storage.set(STORE.cookie, cookie);
+  // 记下登录请求头，登录过期时用来自动重放续期
+  try {
+    const keep = {};
+    const src = typeof headers.entries === 'function' ? Object.fromEntries(headers.entries()) : headers;
+    for (const k of Object.keys(src || {})) {
+      if (/^(cookie|content-length|connection|accept-encoding)$/i.test(k)) continue;
+      keep[k] = Array.isArray(src[k]) ? src[k].join(', ') : String(src[k]);
+    }
+    ctx.storage.setJSON(STORE.loginHeaders, keep);
+  } catch (e) {}
 
   if (changed) {
     ctx.storage.set(STORE.loginTs, String(Date.now()));
@@ -581,6 +593,42 @@ function buildQuery(ctx, params, kind) {
   };
 }
 
+// 从任意响应里收 Set-Cookie，滚动保持会话
+function absorbSetCookie(ctx, headers) {
+  const sc = String(getHeader(headers, 'set-cookie') || '').trim();
+  if (sc && /JSESSIONID=/i.test(sc) && ctx.storage.get(STORE.cookie) !== sc) {
+    ctx.storage.set(STORE.cookie, sc);
+    return true;
+  }
+  return false;
+}
+
+// 登录过期时：重放捕获到的 autoLogin 请求换新 Cookie（10 分钟内最多一次）
+async function autoRefreshSession(ctx) {
+  const url = ctx.storage.get(STORE.loginUrl) || '';
+  const body = ctx.storage.get(STORE.paramsEnc) || '';
+  if (!url || !body) return false;
+  const last = parseInt(ctx.storage.get(STORE.refreshTs) || '0', 10);
+  if (Date.now() - last < 10 * 60 * 1000) return false;
+  ctx.storage.set(STORE.refreshTs, String(Date.now()));
+  let headers = {};
+  try { headers = ctx.storage.getJSON(STORE.loginHeaders) || {}; } catch (e) {}
+  if (!Object.keys(headers).some((k) => /^x-qen$/i.test(k))) headers['x-qen'] = ctx.storage.get(STORE.xqen) || '2';
+  if (!Object.keys(headers).some((k) => /^content-type$/i.test(k))) headers['Content-Type'] = 'application/json';
+  if (!Object.keys(headers).some((k) => /^user-agent$/i.test(k))) headers['User-Agent'] = UA_WAP;
+  const oldCookie = ctx.storage.get(STORE.cookie) || '';
+  if (oldCookie) headers['Cookie'] = oldCookie;
+  try {
+    const resp = await ctx.http.post(url, { headers, body, timeout: 15000 });
+    const ok = !!resp && resp.status === 200 && absorbSetCookie(ctx, resp.headers);
+    dlog(ctx, `自动续期 HTTP=${resp ? resp.status : 'no-resp'} 新Cookie=${ok}`);
+    return ok;
+  } catch (e) {
+    dlog(ctx, `自动续期失败: ${String((e && e.message) || e).slice(0, 80)}`);
+    return false;
+  }
+}
+
 async function queryKind(ctx, kind) {
   const params = decryptParams(ctx);
   const q = buildQuery(ctx, params, kind);
@@ -590,6 +638,7 @@ async function queryKind(ctx, kind) {
     e.stage = 'network';
     throw e;
   }
+  absorbSetCookie(ctx, resp.headers);
   const text = typeof resp.text === 'function' ? await resp.text() : String(resp.body || '');
   if (ctx.env.CM_DEBUG === 'true') ctx.storage.set(STORE.rawDebug, text.slice(0, 300));
 
@@ -748,12 +797,20 @@ async function loadData(ctx) {
   if (!hasParams) return { configured: false, reason: 'capture', debug };
   if (!/^\d{11}$/.test(phone)) return { configured: false, reason: 'phone', debug };
 
-  try {
+  const fetchAll = async () => {
     const feeData = await queryKind(ctx, 'fee');
     const planData = await queryKind(ctx, 'plan');
     const ds = parseMobile(feeData, planData, {
       showUsedFlow: ctx.env.CM_SHOW_USED_FLOW === 'true',
     });
+    return { feeData, planData, ds };
+  };
+  try {
+    let { feeData, planData, ds } = await fetchAll();
+    // 登录过期 → 自动重放登录续期，成功就再查一次
+    if (!ds.valid && await autoRefreshSession(ctx)) {
+      ({ feeData, planData, ds } = await fetchAll());
+    }
     // 接口返回 200 但内容是错误（多为登录态过期）：不覆盖缓存，回退旧数据
     if (!ds.valid) {
       const rc = (d) => d && (d.retCode || (d.body && d.body.retCode)) || '';
