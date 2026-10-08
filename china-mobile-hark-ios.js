@@ -992,7 +992,7 @@ function glass(children, extra) {
 
 /* ---------- 尺寸 ---------- */
 
-function miniRow(icon, color, d, barW) {
+function miniRow(icon, color, d, barW, label) {
   const data = d || { title: '', number: '--', unit: '', percent: 0 };
   return {
     type: 'stack', direction: 'column', alignItems: 'start', gap: 2,
@@ -1001,6 +1001,7 @@ function miniRow(icon, color, d, barW) {
         type: 'stack', direction: 'row', alignItems: 'center', gap: 4,
         children: [
           { type: 'image', src: `sf-symbol:${icon}`, width: 10, height: 10, color },
+          ...(label ? [t(label, 9, 'medium', SUB, { minScale: 1 })] : []),
           { type: 'spacer' },
           t(data.number, 11, 'bold', TXT, { minScale: 0.8 }),
           t(data.unit ? ` ${data.unit}` : '', 9, 'regular', SUB, { minScale: 1 }),
@@ -1043,9 +1044,9 @@ function buildSmall(title, ds, fromCache, ctx) {
         ],
       },
       { type: 'spacer' },
-      miniRow('wifi', C_FLOW, ds.flow, 128),
-      miniRow('globe.asia.australia.fill', C_OTHER, other, 128),
-      miniRow('phone.fill', C_VOICE, ds.voice, 128),
+      miniRow('wifi', C_FLOW, ds.flow, 144, '通用'),
+      miniRow('globe.asia.australia.fill', C_OTHER, other, 144, '其他'),
+      miniRow('phone.fill', C_VOICE, ds.voice, 144, '语音'),
     ],
   };
 }
