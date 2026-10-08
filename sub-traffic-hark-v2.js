@@ -959,7 +959,7 @@ function weekCard(shown, height) {
       children: [T('近 7 天用量', 11, C.text, 'semibold', { minScale: 1 }), T(`共 ${fmtBytes(week)}`, 10, C.accent, 'semibold', { minScale: 1 }), { type: 'spacer' }, ...legend],
     },
     { type: 'spacer' },
-    { type: 'image', src: weekSvg(shown, 300, 56), width: 296, height: 52 },
+    { type: 'image', src: weekSvg(shown, 300, 76), width: 296, height: 70 },
     { type: 'stack', direction: 'row', gap: 0, children: labels.map((l, i) => T(l, 9, i === 6 ? C.text : C.dim, i === 6 ? 'semibold' : 'medium', { flex: 1, textAlign: 'center', minScale: 1 })) },
   ], { height, gap: 4, padding: [9, 11], borderRadius: 16 });
 }
@@ -977,7 +977,7 @@ function multiLarge(ctx, list) {
   const rows = [];
   // 行高固定，避免 Egern 把整行撑高后卡片上下居中留白
   for (let k = 0; k < cells.length; k += 2) rows.push({ type: 'stack', direction: 'row', alignItems: 'start', gap: 8, height: O.height, children: cells.slice(k, k + 2) });
-  if (two) rows.push(weekCard(shown, 112));
+  if (two) rows.push(weekCard(shown, 132));
   const top = odd ? [] : [{
     type: 'stack', direction: 'row', alignItems: 'end', gap: 6,
     children: [
