@@ -805,7 +805,7 @@ function detailCard(s, i, o = {}) {
           type: 'stack', direction: 'column', alignItems: 'start', gap: 0,
           children: [
             { type: 'stack', direction: 'row', alignItems: 'end', gap: 2, children: [T(b.n, F.big, C.text, 'bold', { minScale: 1 }), T(b.u, F.small, C.dim, 'semibold', { minScale: 1 })] },
-            t9(`已用 ${fmtBytes(t.used)} / ${t.unlimited ? '∞' : fmtBytes(t.total)}`),
+            T(`已用 ${fmtBytes(t.used)} / ${t.unlimited ? '∞' : fmtBytes(t.total)}`, F.small, C.dim, 'medium', { minScale: 0.7 }),
           ],
         },
         { type: 'spacer' },
@@ -866,7 +866,7 @@ function compactCard(s, i) {
         t8(`今日 ${s.today == null ? '--' : fmtBytes(s.today)}`, C.text, 'semibold'),
       ],
     },
-    t8(fc.text.replace('按近期速度 ', ''), fc.color, 'semibold'),
+    t8(fc.text, fc.color, 'semibold'),
     t8(`${e == null ? '长期' : `到期${Math.max(0, e)}天`}${r ? (r.days === 0 ? '·今日重置' : `·重置${r.days}天`) : ''}`),
   ], CARD);
 }
@@ -900,35 +900,49 @@ function multiMedium(ctx, list) {
   };
 }
 
-// 大号：两列详情卡网格（2/3/4 个订阅），顶部合计
+// 大号：两列详情卡网格；3 个订阅时第 4 格放合计卡，4 个时顶部一行合计
+function sumCard(shown, sumRemain, sumToday, o) {
+  const nodes = shown.reduce((a, s) => a + (s.nodeCount || 0), 0);
+  return glass([
+    { type: 'stack', direction: 'row', alignItems: 'center', gap: 4, children: [icon('sum', C.accent, 11), T(`${shown.length} 个订阅合计`, 12, C.text, 'semibold', { minScale: 1 })] },
+    {
+      type: 'stack', direction: 'row', alignItems: 'center', gap: 8,
+      children: [
+        { type: 'image', src: ringsSvg(shown.map((s, i) => ({ pct: s.traffic ? (pctLeft(s.traffic) ?? 1) : 0, color: colorOf(i) })), 120, 12, 3), width: 56, height: 56 },
+        {
+          type: 'stack', direction: 'column', alignItems: 'start', gap: 1,
+          children: [T('合计剩余', 10, C.dim, 'medium', { minScale: 1 }), bigRemain({ remaining: sumRemain }, 22)],
+        },
+      ],
+    },
+    T(`今日已用 ${fmtBytes(sumToday)}`, 10, C.accent, 'semibold', { minScale: 1 }),
+    T(nodes ? `共 ${nodes} 节点` : ' ', 10, C.dim, 'medium', { minScale: 1 }),
+  ], { flex: 1, height: o.height, gap: 5, padding: o.padding, borderRadius: 16 });
+}
+
 function multiLarge(ctx, list) {
   const shown = list.slice(0, 4);
   const withT = shown.filter(s => s.traffic && !s.traffic.unlimited && Number.isFinite(s.traffic.remaining));
   const sumRemain = withT.reduce((a, s) => a + s.traffic.remaining, 0);
   const sumToday = shown.reduce((a, s) => a + (s.today || 0), 0);
+  const odd = shown.length % 2 === 1;
+  const O = { height: odd ? 146 : 128, gap: odd ? 4 : 3, padding: [9, 11], name: 12, big: 22, small: 10 };
+  const cells = shown.map((s, i) => detailCard(s, i, O));
+  if (odd) cells.push(sumCard(shown, sumRemain, sumToday, O));
   const rows = [];
-  for (let k = 0; k < shown.length; k += 2) {
-    rows.push({
-      type: 'stack', direction: 'row', gap: 8,
-      children: shown.slice(k, k + 2).map((s, j) => detailCard(s, k + j, { height: 128, gap: 3, padding: [9, 11], name: 12, big: 22, small: 10 })),
-    });
-  }
+  for (let k = 0; k < cells.length; k += 2) rows.push({ type: 'stack', direction: 'row', gap: 8, children: cells.slice(k, k + 2) });
+  const top = odd ? [] : [{
+    type: 'stack', direction: 'row', alignItems: 'end', gap: 6,
+    children: [
+      T(`${shown.length} 个订阅 合计剩余`, 11, C.dim, 'medium'),
+      bigRemain({ remaining: sumRemain }, 20),
+      { type: 'spacer' },
+      T(`今日已用 ${fmtBytes(sumToday)}`, 11, C.accent, 'semibold'),
+    ],
+  }];
   return {
     type: 'widget', padding: [12, 14], gap: 8, backgroundGradient: bg(), refreshAfter: refreshAt(ctx),
-    children: [
-      header(list, titleOf(ctx, list)),
-      {
-        type: 'stack', direction: 'row', alignItems: 'end', gap: 6,
-        children: [
-          T(`${shown.length} 个订阅 合计剩余`, 11, C.dim, 'medium'),
-          bigRemain({ remaining: sumRemain }, 20),
-          { type: 'spacer' },
-          T(`今日已用 ${fmtBytes(sumToday)}`, 11, C.accent, 'semibold'),
-        ],
-      },
-      ...rows,
-      { type: 'spacer' },
-    ],
+    children: [header(list, titleOf(ctx, list)), ...top, ...rows, { type: 'spacer' }],
   };
 }
 
