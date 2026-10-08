@@ -1184,8 +1184,8 @@ function buildSmall(title, ds, fromCache, ctx) {
           t(`今日 ${fmtMB(ins.todayMB)}`, 9, 'semibold', TXT, { minScale: 1 }),
         ],
       },
-      t(`语音 ${ds.voice.number}${ds.voice.unit || ''} · 日均 ${fmtMB(ins.dailyMB)}`, 9, 'medium', SUB, { minScale: 0.8 }),
-      t(ins.forecast.text, 9, 'semibold', ins.forecast.color, { minScale: 0.8 }),
+      t(`其他 ${ds.otherFlow ? ds.otherFlow.number + (ds.otherFlow.unit || '') : '--'} · 语音 ${ds.voice.number}${ds.voice.unit || ''}`, 9, 'medium', SUB, { minScale: 0.75 }),
+      t(`日均可用 ${fmtMB(ins.dailyMB)} · ${ins.forecast.text}`, 9, 'semibold', ins.forecast.color, { minScale: 0.7 }),
     ],
   };
 }
