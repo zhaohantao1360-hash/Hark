@@ -776,66 +776,113 @@ function multiSmall(ctx, list) {
   };
 }
 
+// 详情卡（两订阅中号 / 大号网格共用）
+function detailCard(s, i, o = {}) {
+  const F = { name: o.name || 11, big: o.big || 19, small: o.small || 9 };
+  const CARD = { flex: 1, height: o.height || 108, gap: o.gap || 2, padding: o.padding || [7, 9], borderRadius: 16 };
+  const t9 = (txt, c, w) => T(txt, F.small, c || C.dim, w || 'medium', { minScale: 1 });
+  const color = colorOf(i);
+  const st = status(s);
+  const right = st.color !== C.ok && s.traffic ? t9(st.label, st.color, 'semibold') : t9(s.nodeCount > 0 ? `${s.nodeCount} 节点` : '-- 节点');
+  const head = {
+    type: 'stack', direction: 'row', alignItems: 'center', gap: 4,
+    children: [dot(st.color === C.ok ? color : st.color), T(s.name, F.name, C.text, 'semibold', { minScale: 1 }), { type: 'spacer' }, right],
+  };
+  if (!s.traffic) return glass([head, { type: 'spacer' }, T('读取失败', 13, C.dim, 'semibold', { minScale: 1 }), t9(s.error || '稍后自动重试'), { type: 'spacer' }], CARD);
+  const t = s.traffic;
+  const p = pctLeft(t);
+  const daily = dailyBudget(s);
+  const e = daysUntil(t.expireAt);
+  const r = nextReset(s.resetDay);
+  const b = splitBytes(t.remaining);
+  const fc = forecast(s);
+  return glass([
+    head,
+    {
+      type: 'stack', direction: 'row', alignItems: 'end', gap: 4,
+      children: [
+        {
+          type: 'stack', direction: 'column', alignItems: 'start', gap: 0,
+          children: [
+            { type: 'stack', direction: 'row', alignItems: 'end', gap: 2, children: [T(b.n, F.big, C.text, 'bold', { minScale: 1 }), T(b.u, F.small, C.dim, 'semibold', { minScale: 1 })] },
+            t9(`已用 ${fmtBytes(t.used)} / ${t.unlimited ? '∞' : fmtBytes(t.total)}`),
+          ],
+        },
+        { type: 'spacer' },
+        {
+          type: 'stack', direction: 'column', alignItems: 'center', gap: -4,
+          children: [
+            { type: 'image', src: gaugeSvg(p == null ? 1 : p, color, 64), width: 40, height: 23 },
+            T(p == null ? '∞' : `${Math.round(p * 100)}%`, F.small, color, 'bold', { minScale: 1 }),
+          ],
+        },
+      ],
+    },
+    {
+      type: 'stack', direction: 'row', alignItems: 'end', gap: 5,
+      children: [
+        { type: 'image', src: sparkSvg(s.hist || [null, null, null, null, null, null, s.today], color, 70, 14), width: 52, height: 12 },
+        t9(`今日 ${s.today == null ? '--' : fmtBytes(s.today)}`, C.text, 'semibold'),
+      ],
+    },
+    t9(`日均可用 ${daily == null ? '--' : fmtBytes(daily)}`),
+    t9(fc.text, fc.color, 'semibold'),
+    t9(`${e == null ? '长期有效' : `到期 ${Math.max(0, e)} 天`} · ${r ? (r.days === 0 ? '今日重置' : `重置 ${r.days} 天`) : '不重置'}`),
+  ], CARD);
+}
+
+// 紧凑卡（三订阅中号）：窄列，信息精简
+function compactCard(s, i) {
+  const color = colorOf(i);
+  const st = status(s);
+  const t8 = (txt, c, w) => T(txt, 8.5, c || C.dim, w || 'medium', { minScale: 0.8 });
+  const CARD = { flex: 1, height: 108, gap: 2, padding: [7, 8], borderRadius: 16 };
+  const head = {
+    type: 'stack', direction: 'row', alignItems: 'center', gap: 3,
+    children: [dot(st.color === C.ok ? color : st.color), T(s.name, 10, C.text, 'semibold', { minScale: 0.8 })],
+  };
+  if (!s.traffic) return glass([head, { type: 'spacer' }, T('读取失败', 12, C.dim, 'semibold'), t8(s.error || '稍后重试'), { type: 'spacer' }], CARD);
+  const t = s.traffic;
+  const p = pctLeft(t);
+  const b = splitBytes(t.remaining);
+  const fc = forecast(s);
+  const e = daysUntil(t.expireAt);
+  const r = nextReset(s.resetDay);
+  return glass([
+    head,
+    {
+      type: 'stack', direction: 'row', alignItems: 'end', gap: 2,
+      children: [
+        T(b.n, 17, C.text, 'bold', { minScale: 0.7 }), T(b.u, 8.5, C.dim, 'semibold', { minScale: 1 }),
+        { type: 'spacer' },
+        T(p == null ? '∞' : `${Math.round(p * 100)}%`, 9, color, 'bold', { minScale: 1 }),
+      ],
+    },
+    { type: 'image', src: barSvg(p == null ? 1 : p, color, 90, 4), width: 84, height: 4 },
+    {
+      type: 'stack', direction: 'row', alignItems: 'end', gap: 3,
+      children: [
+        { type: 'image', src: sparkSvg(s.hist || [null, null, null, null, null, null, s.today], color, 70, 14), width: 30, height: 10 },
+        t8(`今日 ${s.today == null ? '--' : fmtBytes(s.today)}`, C.text, 'semibold'),
+      ],
+    },
+    t8(fc.text.replace('按近期速度 ', ''), fc.color, 'semibold'),
+    t8(`${e == null ? '长期' : `到期${Math.max(0, e)}天`}${r ? (r.days === 0 ? '·今日重置' : `·重置${r.days}天`) : ''}`),
+  ], CARD);
+}
+
 function multiMedium(ctx, list) {
-  const shown = list.slice(0, list.length === 2 ? 2 : 3);
+  const shown = list.slice(0, 4);
   if (shown.length === 2) {
-    // 两个订阅（仪表盘版）：半圆仪表 + 7 天柱状图 + 用量预测，两张卡完全一致
-    const F = { name: 11, big: 19, small: 9 };
-    const CARD = { flex: 1, height: 108, gap: 2, padding: [7, 9], borderRadius: 16 };
-    const t9 = (txt, c, w) => T(txt, F.small, c || C.dim, w || 'medium', { minScale: 1 });
-    const card = (s, i) => {
-      const color = colorOf(i);
-      const st = status(s);
-      const right = st.color !== C.ok && s.traffic ? t9(st.label, st.color, 'semibold') : t9(s.nodeCount > 0 ? `${s.nodeCount} 节点` : '-- 节点');
-      const head = {
-        type: 'stack', direction: 'row', alignItems: 'center', gap: 4,
-        children: [dot(st.color === C.ok ? color : st.color), T(s.name, F.name, C.text, 'semibold', { minScale: 1 }), { type: 'spacer' }, right],
-      };
-      if (!s.traffic) return glass([head, { type: 'spacer' }, T('读取失败', 13, C.dim, 'semibold', { minScale: 1 }), t9(s.error || '稍后自动重试'), { type: 'spacer' }], CARD);
-      const t = s.traffic;
-      const p = pctLeft(t);
-      const daily = dailyBudget(s);
-      const e = daysUntil(t.expireAt);
-      const r = nextReset(s.resetDay);
-      const b = splitBytes(t.remaining);
-      const fc = forecast(s);
-      return glass([
-        head,
-        {
-          type: 'stack', direction: 'row', alignItems: 'end', gap: 4,
-          children: [
-            {
-              type: 'stack', direction: 'column', alignItems: 'start', gap: 0,
-              children: [
-                { type: 'stack', direction: 'row', alignItems: 'end', gap: 2, children: [T(b.n, F.big, C.text, 'bold', { minScale: 1 }), T(b.u, F.small, C.dim, 'semibold', { minScale: 1 })] },
-                t9(`已用 ${fmtBytes(t.used)} / ${t.unlimited ? '∞' : fmtBytes(t.total)}`),
-              ],
-            },
-            { type: 'spacer' },
-            {
-              type: 'stack', direction: 'column', alignItems: 'center', gap: -4,
-              children: [
-                { type: 'image', src: gaugeSvg(p == null ? 1 : p, color, 64), width: 40, height: 23 },
-                T(p == null ? '∞' : `${Math.round(p * 100)}%`, F.small, color, 'bold', { minScale: 1 }),
-              ],
-            },
-          ],
-        },
-        {
-          type: 'stack', direction: 'row', alignItems: 'end', gap: 5,
-          children: [
-            { type: 'image', src: sparkSvg(s.hist || [null, null, null, null, null, null, s.today], color, 70, 14), width: 52, height: 12 },
-            t9(`今日 ${s.today == null ? '--' : fmtBytes(s.today)}`, C.text, 'semibold'),
-          ],
-        },
-        t9(`日均可用 ${daily == null ? '--' : fmtBytes(daily)}`),
-        t9(fc.text, fc.color, 'semibold'),
-        t9(`${e == null ? '长期有效' : `到期 ${Math.max(0, e)} 天`} · ${r ? (r.days === 0 ? '今日重置' : `重置 ${r.days} 天`) : '不重置'}`),
-      ], CARD);
-    };
     return {
       type: 'widget', padding: [9, 11], gap: 5, backgroundGradient: bg(), refreshAfter: refreshAt(ctx),
-      children: [header(list, titleOf(ctx, list)), { type: 'stack', direction: 'row', gap: 7, flex: 1, children: shown.map(card) }],
+      children: [header(list, titleOf(ctx, list)), { type: 'stack', direction: 'row', gap: 7, flex: 1, children: shown.map((s, i) => detailCard(s, i)) }],
+    };
+  }
+  if (shown.length === 3) {
+    return {
+      type: 'widget', padding: [9, 11], gap: 5, backgroundGradient: bg(), refreshAfter: refreshAt(ctx),
+      children: [header(list, titleOf(ctx, list)), { type: 'stack', direction: 'row', gap: 6, flex: 1, children: shown.map((s, i) => compactCard(s, i)) }],
     };
   }
   return {
@@ -846,38 +893,40 @@ function multiMedium(ctx, list) {
         type: 'stack', direction: 'row', alignItems: 'center', gap: 12, flex: 1,
         children: [
           { type: 'image', src: ringsSvg(shown.map((s, i) => ({ pct: s.traffic ? (pctLeft(s.traffic) ?? 1) : 0, color: colorOf(i) })), 120, 12, 3), width: 80, height: 80 },
-          glass(shown.map((s, i) => subRow(s, i, 190, { valueSize: 13 })), { flex: 1, gap: 7, padding: [10, 12] }),
+          glass(shown.map((s, i) => subRow(s, i, 190, { valueSize: 12, barH: 3 })), { flex: 1, gap: 5, padding: [8, 12] }),
         ],
       },
     ],
   };
 }
 
+// 大号：两列详情卡网格（2/3/4 个订阅），顶部合计
 function multiLarge(ctx, list) {
-  const withT = list.filter(s => s.traffic && !s.traffic.unlimited && Number.isFinite(s.traffic.remaining));
+  const shown = list.slice(0, 4);
+  const withT = shown.filter(s => s.traffic && !s.traffic.unlimited && Number.isFinite(s.traffic.remaining));
   const sumRemain = withT.reduce((a, s) => a + s.traffic.remaining, 0);
-  const sumToday = list.reduce((a, s) => a + (s.today || 0), 0);
-  const nodes = list.reduce((a, s) => a + (s.nodeCount || 0), 0);
+  const sumToday = shown.reduce((a, s) => a + (s.today || 0), 0);
+  const rows = [];
+  for (let k = 0; k < shown.length; k += 2) {
+    rows.push({
+      type: 'stack', direction: 'row', gap: 8,
+      children: shown.slice(k, k + 2).map((s, j) => detailCard(s, k + j, { height: 128, gap: 3, padding: [9, 11], name: 12, big: 22, small: 10 })),
+    });
+  }
   return {
-    type: 'widget', padding: 16, gap: 10, backgroundGradient: bg(), refreshAfter: refreshAt(ctx),
+    type: 'widget', padding: [12, 14], gap: 8, backgroundGradient: bg(), refreshAfter: refreshAt(ctx),
     children: [
       header(list, titleOf(ctx, list)),
       {
-        type: 'stack', direction: 'row', alignItems: 'center', gap: 14,
+        type: 'stack', direction: 'row', alignItems: 'end', gap: 6,
         children: [
-          { type: 'image', src: ringsSvg(list.map((s, i) => ({ pct: s.traffic ? (pctLeft(s.traffic) ?? 1) : 0, color: colorOf(i) })), 140, 12, 3), width: 88, height: 88 },
-          {
-            type: 'stack', direction: 'column', alignItems: 'start', gap: 2,
-            children: [
-              T(`${list.length} 个订阅 · 合计剩余`, 11, C.dim, 'medium'),
-              bigRemain({ remaining: sumRemain }, 30),
-              T(`今日已用 ${fmtBytes(sumToday)}${nodes ? ` · ${nodes} 节点` : ''}`, 11, C.accent, 'semibold'),
-            ],
-          },
+          T(`${shown.length} 个订阅 合计剩余`, 11, C.dim, 'medium'),
+          bigRemain({ remaining: sumRemain }, 20),
           { type: 'spacer' },
+          T(`今日已用 ${fmtBytes(sumToday)}`, 11, C.accent, 'semibold'),
         ],
       },
-      ...list.map((s, i) => glass([subRow(s, i, 290, { detail: true, valueSize: 15, barH: 5 })], { padding: [9, 12], borderRadius: 16 })),
+      ...rows,
       { type: 'spacer' },
     ],
   };
