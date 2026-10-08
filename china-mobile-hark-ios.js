@@ -814,11 +814,11 @@ function insights(ctx, ds) {
   let todayMB = null;
   if (flowMB != null) {
     let snap = null;
-    try { snap = ctx.storage.getJSON('cm_ios_day_snap2'); } catch (e) {}
+    try { snap = ctx.storage.getJSON('cm_day_snap'); } catch (e) {}
     // 新的一天，或流量变多（加油包/月初重置）→ 重新记起点
     if (!snap || snap.date !== dayKey || flowMB > snap.start + 1) {
       snap = { date: dayKey, start: flowMB };
-      try { ctx.storage.setJSON('cm_ios_day_snap2', snap); } catch (e) {}
+      try { ctx.storage.setJSON('cm_day_snap', snap); } catch (e) {}
     }
     todayMB = Math.max(0, snap.start - flowMB);
   }
@@ -826,7 +826,7 @@ function insights(ctx, ds) {
   const hist = [];
   if (todayMB != null) {
     let h = {};
-    try { h = ctx.storage.getJSON('cm_ios_hist') || {}; } catch (e) {}
+    try { h = ctx.storage.getJSON('cm_hist') || {}; } catch (e) {}
     h[dayKey] = todayMB;
     const keep = {};
     for (let i = 7; i >= 0; i--) {
@@ -835,7 +835,7 @@ function insights(ctx, ds) {
       if (h[k] != null) keep[k] = h[k];
       if (i <= 6) hist.push(h[k] == null ? null : h[k]);
     }
-    try { ctx.storage.setJSON('cm_ios_hist', keep); } catch (e) {}
+    try { ctx.storage.setJSON('cm_hist', keep); } catch (e) {}
   }
   // 按近 6 天（不含今天）平均用量预测
   let forecast = { text: '用量统计中…', color: SUB };
@@ -1107,20 +1107,20 @@ function buildLarge(title, ds, fromCache, ctx) {
       ],
     },
     { type: 'image', src: barSvg(d.percent, color, 300, 6), width: 296, height: 6 },
-  ], { gap: 7, padding: [9, 12], borderRadius: 18, height: 54 });
+  ], { gap: 6, padding: [8, 12], borderRadius: 16, height: 48 });
   return {
-    type: 'widget', padding: [14, 16], gap: 8, backgroundGradient: bg(),
+    type: 'widget', padding: [13, 15], gap: 7, backgroundGradient: bg(),
     refreshAfter: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     children: [
       header(title, ds, fromCache),
       {
-        type: 'stack', direction: 'row', alignItems: 'center', gap: 14, height: 88,
+        type: 'stack', direction: 'row', alignItems: 'center', gap: 14, height: 80,
         children: [
-          { type: 'image', src: ringsSvg(ringValues(ds), 140, 15, 3), width: 86, height: 86 },
+          { type: 'image', src: ringsSvg(ringValues(ds), 140, 15, 3), width: 78, height: 78 },
           {
             type: 'stack', direction: 'column', alignItems: 'start', gap: 3,
             children: [
-              feeBig(ds, ins, 32),
+              feeBig(ds, ins, 30),
               ...(masked ? [t(masked, 'caption2', 'medium', SUB, { family: 'Menlo' })] : []),
               t(`本月还剩 ${ins.daysLeft} 天${ins.dailyMB != null ? ` · 日均可用 ${fmtMB(ins.dailyMB)}` : ''}`, 'caption2', 'semibold', C_FLOW),
             ],
@@ -1133,21 +1133,15 @@ function buildLarge(title, ds, fromCache, ctx) {
       meter('phone.fill', C_VOICE, ds.voice),
       glass([
         {
-          type: 'stack', direction: 'row', alignItems: 'end', gap: 8,
+          type: 'stack', direction: 'row', alignItems: 'center', gap: 8,
           children: [
-            { type: 'image', src: sparkSvg(ins.hist, C_FLOW, 140, 24), width: 110, height: 20 },
-            {
-              type: 'stack', direction: 'column', alignItems: 'start', gap: 1,
-              children: [
-                t('近 7 天 · 今日', 9, 'medium', SUB, { minScale: 1 }),
-                t(ins.todayMB != null ? fmtMB(ins.todayMB) : '--', 13, 'bold', TXT, { minScale: 1 }),
-              ],
-            },
+            { type: 'image', src: sparkSvg(ins.hist, C_FLOW, 140, 20), width: 120, height: 16 },
+            t(`今日 ${ins.todayMB != null ? fmtMB(ins.todayMB) : '--'}`, 'caption1', 'bold', TXT),
             { type: 'spacer' },
             t(ins.forecast.text, 'caption2', 'semibold', ins.forecast.color),
           ],
         },
-      ], { padding: [8, 12], borderRadius: 16, gap: 0 }),
+      ], { padding: [9, 12], borderRadius: 16, gap: 0, height: 36 }),
       { type: 'spacer' },
       ...(ds.planDebug ? [t(ds.planDebug, 'caption2', 'regular', SUB, { maxLines: 3 })] : []),
     ],
