@@ -1,0 +1,87 @@
+name: 订阅流量监控（Hark 环形版）
+description: 最多 4 个订阅，同心圆环 + 列表样式，大号含近 7 天用量图（与仪表盘版可同时安装）
+env_schema:
+  SUB1_URL:
+    name: 订阅1 链接
+    description: 第 1 个订阅地址（必填）
+    default_value: ''
+  SUB1_NAME:
+    name: 订阅1 名称
+    description: 显示在组件上的名称
+    default_value: ''
+  SUB1_RESET_DAY:
+    name: 订阅1 流量重置日
+    description: 每月几号重置（1~31），留空不显示
+    default_value: ''
+  SUB1_TOTAL_GB:
+    name: 订阅1 套餐总量 (GB)
+    description: 订阅只返回剩余流量时用来估算总量，留空默认 100
+    default_value: ''
+  SUB2_URL:
+    name: 订阅2 链接
+    description: 第 2 个订阅地址（可选）
+    default_value: ''
+  SUB2_NAME:
+    name: 订阅2 名称
+    description: 显示在组件上的名称
+    default_value: ''
+  SUB2_RESET_DAY:
+    name: 订阅2 流量重置日
+    description: 每月几号重置（1~31），留空不显示
+    default_value: ''
+  SUB2_TOTAL_GB:
+    name: 订阅2 套餐总量 (GB)
+    description: 订阅只返回剩余流量时用来估算总量，留空默认 100
+    default_value: ''
+  SUB3_URL:
+    name: 订阅3 链接
+    description: 第 3 个订阅地址（可选）
+    default_value: ''
+  SUB3_NAME:
+    name: 订阅3 名称
+    description: 显示在组件上的名称
+    default_value: ''
+  SUB3_RESET_DAY:
+    name: 订阅3 流量重置日
+    description: 每月几号重置（1~31），留空不显示
+    default_value: ''
+  SUB3_TOTAL_GB:
+    name: 订阅3 套餐总量 (GB)
+    description: 订阅只返回剩余流量时用来估算总量，留空默认 100
+    default_value: ''
+  SUB4_URL:
+    name: 订阅4 链接
+    description: 第 4 个订阅地址（可选）
+    default_value: ''
+  SUB4_NAME:
+    name: 订阅4 名称
+    description: 显示在组件上的名称
+    default_value: ''
+  SUB4_RESET_DAY:
+    name: 订阅4 流量重置日
+    description: 每月几号重置（1~31），留空不显示
+    default_value: ''
+  SUB4_TOTAL_GB:
+    name: 订阅4 套餐总量 (GB)
+    description: 订阅只返回剩余流量时用来估算总量，留空默认 100
+    default_value: ''
+  WIDGET_TITLE:
+    name: 组件标题
+    description: 多个订阅时显示的标题，默认「订阅流量」
+    default_value: ''
+  REFRESH_HOURS:
+    name: 刷新间隔（小时）
+    description: 范围 0.5 ~ 24
+    default_value: '2'
+  SUBSCRIPTION_USER_AGENT:
+    name: 自定义 User-Agent
+    description: 可选，留空自动尝试 clash.meta / Surge 等常见标识
+    default_value: ''
+scriptings:
+- generic:
+    name: 订阅流量监控-环形
+    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/sub-traffic-hark-rings.js
+    timeout: 30
+widgets:
+- name: 订阅流量监控-环形
+  script_name: 订阅流量监控-环形
