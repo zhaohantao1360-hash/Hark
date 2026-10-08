@@ -15,6 +15,7 @@ scriptings:
   - generic:
       name: "china-mobile-hark-dash"
       script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-dash.js"
+      update_interval: 3600
       timeout: 20
       env:
         CM_PHONENUMBER: ""           # 必填：11 位移动手机号
@@ -22,11 +23,23 @@ scriptings:
         # CM_TITLE: "中国移动"        # 小组件标题
         # CM_DEBUG: "false"          # 'true' 显示调试信息
 
+  # 会话保活：每 20 分钟后台查询一次，避免长时间不操作被移动注销登录
+  - schedule:
+      name: "中国移动保活-Hark仪表盘"
+      cron: "*/20 * * * *"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-dash.js"
+      update_interval: 3600
+      timeout: 30
+      env:
+        CM_KEEPALIVE: "true"
+        CM_PHONENUMBER: ""           # 与上面保持一致（留空则用小组件已保存的号码）
+
   # 登录参数捕获：在「中国移动」App 用短信验证码登录一次（建议关闭指纹/面容登录），看到通知即成功
   - http_request:
       name: "中国移动登录捕获-Hark仪表盘"
       match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
       script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-dash.js"
+      update_interval: 3600
       body_required: true
       timeout: 10
 
@@ -35,6 +48,7 @@ scriptings:
       name: "中国移动Cookie捕获-Hark仪表盘"
       match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
       script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-dash.js"
+      update_interval: 3600
       timeout: 10
 
 widgets:
