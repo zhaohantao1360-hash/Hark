@@ -1,0 +1,77 @@
+name: Spotify 去广告
+description: 去广告 + 解锁高级功能 + 屏蔽 Spotify QUIC（修复随机切歌）。改编自 SIJULY/egern-radar 与 devchristian1337/loon-plugins。启用后请退出并重新登录 Spotify。
+author: 小龙女她爸（Egern 原生版由 Hark 改写）
+homepage: https://github.com/SIJULY/egern-radar
+icon: music.note
+
+rules:
+  # Egern 原生支持 quic 协议匹配：只拦 QUIC，不误伤其他 UDP
+  - and:
+      match:
+        - domain_suffix:
+            match: spotify.com
+        - protocol:
+            match: quic
+      policy: REJECT
+  - domain:
+      match: aet.spotify.com
+      policy: REJECT
+
+url_rewrites:
+  # gabo 埋点上报：200 空响应（原来要跑一个脚本）
+  - match: "^https://(spclient\\.wg|[\\w-]+-spclient)\\.spotify\\.com(:443)?/gabo-receiver-service"
+    location: "http://reject-200/"
+  # 以下四条原为 reject-dict 脚本，改用内置 reject-dict，无需下载/执行脚本
+  - match: "^https://(spclient\\.wg|[\\w-]+-spclient)\\.spotify\\.com(:443)?/pendragon"
+    location: "http://reject-dict/"
+  - match: "^https://(spclient\\.wg|[\\w-]+-spclient)\\.spotify\\.com(:443)?/watch-feed-entrypoints/v\\d/discovery-from-seed"
+    location: "http://reject-dict/"
+  - match: "^https://(spclient\\.wg|[\\w-]+-spclient)\\.spotify\\.com(:443)?/pam-view-service/"
+    location: "http://reject-dict/"
+  # AI DJ 歌单：原规则不限域名，这里限定到 spclient，避免误伤
+  - match: "^https://(spclient\\.wg|[\\w-]+-spclient)\\.spotify\\.com(:443)?/.*37i9dQZF1EYkqdzj48dyYq"
+    location: "http://reject-dict/"
+
+header_rewrites:
+  - delete:
+      match: "^https://(spclient\\.wg|[\\w-]+-spclient)\\.spotify\\.com(:443)?/user-customization-service/v1/customize"
+      name: if-none-match
+      type: request
+
+scriptings:
+  # 去广告（protobuf 二进制补丁）
+  - http_response:
+      name: spotify-nosearchad
+      match: "^https://(spclient\\.wg|[\\w-]+-spclient)\\.spotify\\.com(:443)?/browsita/v\\d/browse"
+      script_url: https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/Spotify/spot-NoSearchAd.js
+      body_required: true
+      binary_body: true
+      max_size: 4194304
+  - http_response:
+      name: spotify-nohomead
+      match: "^https://(spclient\\.wg|[\\w-]+-spclient)\\.spotify\\.com(:443)?/casita/v\\d/home/"
+      script_url: https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/Spotify/spot-NoHomeAd.js
+      body_required: true
+      binary_body: true
+      max_size: 4194304
+  - http_response:
+      name: spotify-noscrollad
+      match: "^https://(spclient\\.wg|[\\w-]+-spclient)\\.spotify\\.com(:443)?/scrollsita/v\\d/scroll/spotify"
+      script_url: https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/Spotify/spot-NoScrollAd.js
+      body_required: true
+      binary_body: true
+      max_size: 4194304
+  # 解锁高级功能（本地 protobuf 补丁，脚本约 420KB，超时放宽到 30 秒）
+  - http_response:
+      name: spotify-proto
+      match: "^https://(spclient\\.wg|[\\w-]+-spclient)\\.spotify\\.com(:443)?/(bootstrap/v1/bootstrap|user-customization-service/v1/customize)(\\?.*)?$"
+      script_url: https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/Spotify/spot-proto-ev3.js
+      body_required: true
+      binary_body: true
+      max_size: 4194304
+      timeout: 30
+
+mitm:
+  hostnames:
+    - spclient.wg.spotify.com
+    - "*-spclient.spotify.com"
