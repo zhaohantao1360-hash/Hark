@@ -752,11 +752,19 @@ async function loadData(ctx) {
     const ds = parseMobile(feeData, planData, {
       showUsedFlow: ctx.env.CM_SHOW_USED_FLOW === 'true',
     });
+    // 没有流量和语音 → 多为登录态过期（接口回 200 空壳）：不写缓存，回退旧数据
+    if (ds.flow.number === '--' && ds.voice.number === '--') {
+      const err = new Error('empty plan');
+      err.stage = 'session';
+      throw err;
+    }
     if (debug) ds.planDebug = ctx.storage.get(STORE.planDebug) || '';
     ctx.storage.setJSON(STORE.datasource, ds);
     return { configured: true, ds, fromCache: false, debug };
   } catch (e) {
-    const cached = ctx.storage.getJSON(STORE.datasource);
+    let cached = ctx.storage.getJSON(STORE.datasource);
+    if (cached && cached.flow && cached.flow.number === '--' && cached.voice && cached.voice.number === '--') cached = null;
+    if (cached) cached.stale = (e && e.stage) === 'session' ? '登录过期' : '缓存';
     const errInfo = debug ? ` [${(e && e.stage) || '?'}:${String((e && e.message) || e).slice(0, 60)}]` : '';
     if (cached) cached.planDebug = (cached.planDebug || '') + errInfo;
     return {
