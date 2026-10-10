@@ -786,7 +786,9 @@ function parseMobile(feeData, planData, opts) {
   }
 
   const feeOk = feeInfo && (feeInfo.realBalanceFee != null || feeInfo.curFee != null);
-  const valid = feeOk || flows.length > 0 || voices.length > 0;
+  // 只有话费、没有流量和语音 → 多为登录态过期（接口仍回 200 空壳），按无效处理，走续期/缓存
+  const valid = flows.length > 0 || voices.length > 0;
+  void feeOk;
   return { fee, flow, otherFlow, voice, updatedAt: Date.now(), valid };
 }
 
