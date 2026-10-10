@@ -324,6 +324,8 @@ const STORE = {
   xqen: 'cm_x_qen',             // 捕获的 x-qen（'2'/'12'/'14'）
   loginUrl: 'cm_login_url',     // 捕获的 autoLogin URL
   cookie: 'cm_cookie',          // Cookie / Set-Cookie
+  loginHeaders: 'cm_login_headers', // 捕获的 autoLogin 请求头（用于自动续期）
+  refreshTs: 'cm_refresh_ts',       // 上次自动续期时间
   loginTs: 'cm_login_ts',
   datasource: 'cm_datasource',
   rawDebug: 'cm_raw_debug',
@@ -445,6 +447,16 @@ async function handleCapture(ctx) {
   ctx.storage.set(STORE.loginUrl, url);
   const cookie = String(getHeader(headers, 'cookie') || '').trim();
   if (cookie) ctx.storage.set(STORE.cookie, cookie);
+  // 记下登录请求头，登录过期时用来自动重放续期
+  try {
+    const keep = {};
+    const src = typeof headers.entries === 'function' ? Object.fromEntries(headers.entries()) : headers;
+    for (const k of Object.keys(src || {})) {
+      if (/^(cookie|content-length|connection|accept-encoding)$/i.test(k)) continue;
+      keep[k] = Array.isArray(src[k]) ? src[k].join(', ') : String(src[k]);
+    }
+    ctx.storage.setJSON(STORE.loginHeaders, keep);
+  } catch (e) {}
 
   if (changed) {
     ctx.storage.set(STORE.loginTs, String(Date.now()));
@@ -581,6 +593,42 @@ function buildQuery(ctx, params, kind) {
   };
 }
 
+// 从任意响应里收 Set-Cookie，滚动保持会话
+function absorbSetCookie(ctx, headers) {
+  const sc = String(getHeader(headers, 'set-cookie') || '').trim();
+  if (sc && /JSESSIONID=/i.test(sc) && ctx.storage.get(STORE.cookie) !== sc) {
+    ctx.storage.set(STORE.cookie, sc);
+    return true;
+  }
+  return false;
+}
+
+// 登录过期时：重放捕获到的 autoLogin 请求换新 Cookie（10 分钟内最多一次）
+async function autoRefreshSession(ctx) {
+  const url = ctx.storage.get(STORE.loginUrl) || '';
+  const body = ctx.storage.get(STORE.paramsEnc) || '';
+  if (!url || !body) return false;
+  const last = parseInt(ctx.storage.get(STORE.refreshTs) || '0', 10);
+  if (Date.now() - last < 10 * 60 * 1000) return false;
+  ctx.storage.set(STORE.refreshTs, String(Date.now()));
+  let headers = {};
+  try { headers = ctx.storage.getJSON(STORE.loginHeaders) || {}; } catch (e) {}
+  if (!Object.keys(headers).some((k) => /^x-qen$/i.test(k))) headers['x-qen'] = ctx.storage.get(STORE.xqen) || '2';
+  if (!Object.keys(headers).some((k) => /^content-type$/i.test(k))) headers['Content-Type'] = 'application/json';
+  if (!Object.keys(headers).some((k) => /^user-agent$/i.test(k))) headers['User-Agent'] = UA_WAP;
+  const oldCookie = ctx.storage.get(STORE.cookie) || '';
+  if (oldCookie) headers['Cookie'] = oldCookie;
+  try {
+    const resp = await ctx.http.post(url, { headers, body, timeout: 15000 });
+    const ok = !!resp && resp.status === 200 && absorbSetCookie(ctx, resp.headers);
+    dlog(ctx, `自动续期 HTTP=${resp ? resp.status : 'no-resp'} 新Cookie=${ok}`);
+    return ok;
+  } catch (e) {
+    dlog(ctx, `自动续期失败: ${String((e && e.message) || e).slice(0, 80)}`);
+    return false;
+  }
+}
+
 async function queryKind(ctx, kind) {
   const params = decryptParams(ctx);
   const q = buildQuery(ctx, params, kind);
@@ -590,6 +638,7 @@ async function queryKind(ctx, kind) {
     e.stage = 'network';
     throw e;
   }
+  absorbSetCookie(ctx, resp.headers);
   const text = typeof resp.text === 'function' ? await resp.text() : String(resp.body || '');
   if (ctx.env.CM_DEBUG === 'true') ctx.storage.set(STORE.rawDebug, text.slice(0, 300));
 
@@ -746,12 +795,17 @@ async function loadData(ctx) {
   if (!hasParams) return { configured: false, reason: 'capture', debug };
   if (!/^\d{11}$/.test(phone)) return { configured: false, reason: 'phone', debug };
 
-  try {
+  const fetchAll = async () => {
     const feeData = await queryKind(ctx, 'fee');
     const planData = await queryKind(ctx, 'plan');
-    const ds = parseMobile(feeData, planData, {
+    return parseMobile(feeData, planData, {
       showUsedFlow: ctx.env.CM_SHOW_USED_FLOW === 'true',
     });
+  };
+  try {
+    let ds = await fetchAll();
+    // 登录过期 → 自动重放登录续期，成功就再查一次
+    if (ds.flow.number === '--' && ds.voice.number === '--' && await autoRefreshSession(ctx)) ds = await fetchAll();
     // 没有流量和语音 → 多为登录态过期（接口回 200 空壳）：不写缓存，回退旧数据
     if (ds.flow.number === '--' && ds.voice.number === '--') {
       const err = new Error('empty plan');
@@ -1262,5 +1316,22 @@ export default async function (ctx) {
     }
     return handleCapture(ctx);
   }
+  // 定时保活：每 20 分钟查一次，防止会话因长时间不操作被注销（410000）
+  if (ctx.env && ctx.env.CM_KEEPALIVE === 'true') return handleKeepAlive(ctx);
   return handleWidget(ctx);
+}
+
+async function handleKeepAlive(ctx) {
+  const r = await loadData(ctx);
+  const expired = r.configured && (r.stage === 'session' || !r.ds || r.fromCache);
+  dlog(ctx, `保活 ${expired ? '失败:' + (r.error || '') : '成功'}`);
+  if (expired && r.stage === 'session') {
+    const last = parseInt(ctx.storage.get('cm_expire_notify') || '0', 10);
+    if (Date.now() - last > 6 * 3600 * 1000) {
+      ctx.storage.set('cm_expire_notify', String(Date.now()));
+      ctx.notify({ title: '中国移动', body: '登录已过期，打开「中国移动」App 停留几秒即可恢复' });
+    }
+  } else if (!expired) {
+    ctx.storage.set('cm_expire_notify', '0');
+  }
 }
