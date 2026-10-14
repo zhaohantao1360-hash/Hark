@@ -616,7 +616,10 @@ async function getData(ctx, force) {
   if (!cache) { try { const o = ctx.storage.getJSON(K.data); if (o && o.user === username) cache = o; } catch (_) {} }
   const mine = cache && cache.user === username && cache.v === 3 ? cache : null;
   const hours = Math.max(1, num(env.SGCC_REFRESH) || 6);
-  if (mine && mine.list && Date.now() - mine.ts < hours * 3600000 && !force) return { configured: true, cache: mine };
+  // 国网日用电通常次日中午后才出：缓存里最新一天还不是昨天时，白天每 2 小时重查一次
+  let ttl = hours * 3600000;
+  if (mine && mine.list && latestKey(mine.list) < ymdKey(-1) && new Date().getHours() >= 9) ttl = Math.min(ttl, 2 * 3600000);
+  if (mine && mine.list && Date.now() - mine.ts < ttl && !force) return { configured: true, cache: mine };
   // 失败退避：同一账号密码失败后 30 分钟内不重复登录（避免触发锁号），填了新验证码时例外
   let err = null;
   try { err = ctx.storage.getJSON(KE); } catch (_) {}
@@ -681,6 +684,14 @@ function fmt(v, d = 1) {
   return v.toFixed(v % 1 === 0 && d === 1 ? 0 : d);
 }
 function money(v) { return Number.isFinite(v) ? v.toFixed(2) : '--'; }
+function ymdKey(off) { const d = new Date(Date.now() + off * 86400000); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; }
+function latestKey(list) {
+  let m = '';
+  (list || []).forEach((a) => { const l = a && a.dayElecQuantity31 && a.dayElecQuantity31.sevenEleList; (Array.isArray(l) ? l : []).forEach((x) => { const k = dayKey(x.day); if (k && k > m) m = k; }); });
+  return m;
+}
+// 最新一天是昨天才叫「昨日」，否则叫「最新」，避免国网数据延迟时误导
+function dayWord(key) { return key && key === ymdKey(-1) ? '昨日' : key === ymdKey(0) ? '今日' : '最新'; }
 function mmdd(key) { return key && key.length >= 8 ? `${Number(key.slice(4, 6))}/${Number(key.slice(6, 8))}` : ''; }
 function hhmmOf(ts) { const d = new Date(ts); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }
 function updText(ts) {
@@ -852,7 +863,7 @@ function buildSmall(p, r) {
       balanceBlock(p, 22),
       spacer(),
       row([
-        col([T(`昨日 ${mmdd(p.yesterdayKey)}`, 8, C.faint), row([T(fmt(p.yesterday), 13, C.text, 'bold'), T('度', 8, C.dim)], { alignItems: 'end', gap: 1 })], { gap: 0, flex: 1 }),
+        col([T(`${dayWord(p.yesterdayKey)} ${mmdd(p.yesterdayKey)}`, 8, C.faint), row([T(fmt(p.yesterday), 13, C.text, 'bold'), T('度', 8, C.dim)], { alignItems: 'end', gap: 1 })], { gap: 0, flex: 1 }),
         col([row([T('本月', 8, C.faint), ...(p.tier ? [T(tierText(p, true), 8, tierColor(p), 'semibold')] : [])], { gap: 3 }), row([T(fmt(p.monthUse), 13, C.text, 'bold'), T('度', 8, C.dim)], { alignItems: 'end', gap: 1 })], { gap: 0, flex: 1 }),
       ], { gap: 6 }),
       e || flexBars(vals, 20),
@@ -872,7 +883,7 @@ function buildMedium(p, r) {
       header(p, r.cache.ts, false),
       row([
         glass([balanceBlock(p, 22)], { padding: [6, 9], borderRadius: 13, width: 104, height: 58, justifyContent: 'center' }),
-        statCell('sun.max.fill', C.warn, '昨日', fmt(p.yesterday), '度', mmdd(p.yesterdayKey)),
+        statCell('sun.max.fill', C.warn, dayWord(p.yesterdayKey), fmt(p.yesterday), '度', mmdd(p.yesterdayKey)),
         statCell('calendar', C.blue, '本月', fmt(p.monthUse), '度', tierText(p), tierColor(p)),
         statCell('clock.arrow.circlepath', '#BF5AF2', '上月', fmt(lm ? lm.v : NaN, 0), '度', lm && Number.isFinite(lm.cost) ? `¥${money(lm.cost)}` : ''),
       ], { gap: 5, height: 58 }),
@@ -910,7 +921,7 @@ function buildLarge(p, r) {
       row([
         glass([balanceBlock(p, 28)], { padding: [8, 10], borderRadius: 14, flex: 1, height: 110, justifyContent: 'center' }),
         col([
-          row([statCell('sun.max.fill', C.warn, '昨日', fmt(p.yesterday), '度', mmdd(p.yesterdayKey), null, 52),
+          row([statCell('sun.max.fill', C.warn, dayWord(p.yesterdayKey), fmt(p.yesterday), '度', mmdd(p.yesterdayKey), null, 52),
             statCell('calendar', C.blue, '本月', fmt(p.monthUse), '度', tierText(p), tierColor(p), 52)], { gap: 6, height: 52 }),
           row([statCell('clock.arrow.circlepath', '#BF5AF2', '上月', fmt(lm ? lm.v : NaN, 0), '度', lm && Number.isFinite(lm.cost) ? `¥${money(lm.cost)}` : '', null, 52),
             statCell('chart.bar.fill', C.teal, '今年', fmt(p.yearUse, 0), '度', Number.isFinite(p.yearCost) ? `¥${money(p.yearCost)}` : '', null, 52)], { gap: 6, height: 52 }),
@@ -935,7 +946,7 @@ function buildLarge(p, r) {
 function buildLock(p, r, family) {
   const bal = `${p.owe ? '欠' : ''}¥${money(p.balance)}`;
   if (family === 'accessoryInline') {
-    return { type: 'widget', children: [{ type: 'text', text: `⚡ ${bal} · 昨日 ${fmt(p.yesterday)}度${p.tier ? ' · ' + tierText(p, true) : ''}`, maxLines: 1, minScale: 0.6 }] };
+    return { type: 'widget', children: [{ type: 'text', text: `⚡ ${bal} · ${dayWord(p.yesterdayKey)} ${fmt(p.yesterday)}度${p.tier ? ' · ' + tierText(p, true) : ''}`, maxLines: 1, minScale: 0.6 }] };
   }
   if (family === 'accessoryCircular') {
     return {
@@ -951,7 +962,7 @@ function buildLock(p, r, family) {
     type: 'widget', padding: [2, 4], gap: 2,
     children: [
       row([{ type: 'image', src: 'sf-symbol:bolt.fill', width: 10, height: 10 }, { type: 'text', text: `电费 ${bal}`, font: { size: 'caption1', weight: 'semibold' } }, spacer()], { gap: 4 }),
-      { type: 'text', text: `昨日 ${fmt(p.yesterday)}度 · 本月 ${fmt(p.monthUse)}度`, font: { size: 'caption2' }, opacity: 0.8, maxLines: 1, minScale: 0.6 },
+      { type: 'text', text: `${dayWord(p.yesterdayKey)} ${fmt(p.yesterday)}度 · 本月 ${fmt(p.monthUse)}度`, font: { size: 'caption2' }, opacity: 0.8, maxLines: 1, minScale: 0.6 },
       { type: 'text', text: [Number.isFinite(p.days) ? `可用 ${fmt(p.days, 0)} 天` : `更新 ${updText(r.cache.ts)}`, tierText(p, true)].filter(Boolean).join(' · '), font: { size: 'caption2' }, opacity: 0.7, maxLines: 1, minScale: 0.6 },
     ],
   };
