@@ -201,7 +201,9 @@ async function fetchSubscription(ctx, url, customUA) {
     'clash-verge/v2.2.3',
     'v2rayN/6.42',
     'Surge/5.0',
-    'Quantumult%20X/1.5.0'
+    'Quantumult%20X/1.5.0',
+    'mihomo/1.18.10',
+    'Shadowrocket/2070'
   ].filter(Boolean))];
 
   const extract = async response => {
@@ -222,7 +224,9 @@ async function fetchSubscription(ctx, url, customUA) {
   let succeeded = false;
   let foundTraffic = null;
 
+  const deadline = Date.now() + 18000; // 总时长上限，避免超过脚本 30 秒超时
   for (const userAgent of userAgents) {
+    if (succeeded && Date.now() > deadline) break;
     try {
       const response = await ctx.http.get(url, {
         timeout: 8000,
@@ -831,7 +835,7 @@ function detailCard(s, i, o = {}) {
     type: 'stack', direction: 'row', alignItems: 'center', gap: 4,
     children: [dot(st.color === C.ok ? color : st.color), T(s.name, F.name, C.text, 'semibold', { minScale: 1 }), { type: 'spacer' }, right],
   };
-  if (!s.traffic) return glass([head, { type: 'spacer' }, T('读取失败', 13, C.dim, 'semibold', { minScale: 1 }), t9(s.error || '稍后自动重试'), { type: 'spacer' }], CARD);
+  if (!s.traffic) return glass([head, { type: 'spacer' }, T(s.nodeCount > 0 && !s.error ? '没有流量信息' : '读取失败', 13, C.dim, 'semibold', { minScale: 1 }), t9(s.error || (s.nodeCount > 0 ? '机场未返回用量' : '稍后自动重试')), { type: 'spacer' }], CARD);
   const t = s.traffic;
   const p = pctLeft(t);
   const daily = dailyBudget(s);
@@ -884,7 +888,7 @@ function compactCard(s, i) {
     type: 'stack', direction: 'row', alignItems: 'center', gap: 3,
     children: [dot(st.color === C.ok ? color : st.color), T(s.name, 10, C.text, 'semibold', { minScale: 0.8 })],
   };
-  if (!s.traffic) return glass([head, { type: 'spacer' }, T('读取失败', 12, C.dim, 'semibold'), t8(s.error || '稍后重试'), { type: 'spacer' }], CARD);
+  if (!s.traffic) return glass([head, { type: 'spacer' }, T(s.nodeCount > 0 && !s.error ? '没有流量信息' : '读取失败', 12, C.dim, 'semibold'), t8(s.error || (s.nodeCount > 0 ? '机场未返回用量' : '稍后重试')), { type: 'spacer' }], CARD);
   const t = s.traffic;
   const p = pctLeft(t);
   const b = splitBytes(t.remaining);
