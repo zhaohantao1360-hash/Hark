@@ -201,7 +201,9 @@ async function fetchSubscription(ctx, url, customUA) {
     'clash-verge/v2.2.3',
     'v2rayN/6.42',
     'Surge/5.0',
-    'Quantumult%20X/1.5.0'
+    'Quantumult%20X/1.5.0',
+    'mihomo/1.18.10',
+    'Shadowrocket/2070'
   ].filter(Boolean))];
 
   const extract = async response => {
@@ -222,7 +224,9 @@ async function fetchSubscription(ctx, url, customUA) {
   let succeeded = false;
   let foundTraffic = null;
 
+  const deadline = Date.now() + 18000; // 总时长上限，避免超过脚本 30 秒超时
   for (const userAgent of userAgents) {
+    if (succeeded && Date.now() > deadline) break;
     try {
       const response = await ctx.http.get(url, {
         timeout: 8000,
