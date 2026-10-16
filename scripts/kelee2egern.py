@@ -28,9 +28,10 @@ def dump_cond(c,ind):
         for x in v: s+=dump_cond(x,ind+6)
         return s
     return f"{p}- {k}:\n{p}    match: {q(v)}\n"
+def rxfix(rx,ci): return ('(?i)' if ci else '')+rx.replace('\\/','/').replace('\\:',':')
 def convert(src,name,desc,author,icon,dedupe=True,drop=()):
     txt=open(src,encoding='utf-8').read()
-    sec=None;rules=[];rw=[];hosts=[];seen=set();stats={'dup':0,'redundant':0,'dropped':0}
+    sec=None;rules=[];rw=[];body=[];scripts=[];hosts=[];seen=set();stats={'dup':0,'redundant':0,'dropped':0}
     kw=[]
     for line in txt.splitlines():
         l=line.strip()
@@ -54,15 +55,31 @@ def convert(src,name,desc,author,icon,dedupe=True,drop=()):
             rules.append(('simple',MAP[t],val,pol,nr))
         elif sec=='Rewrite':
             m=re.match(r'^request if \$\{url\} ~= /(.+)/(i?) then (reject|reject_dict|reject_array|reject_img)\((\d+)\)$',l)
-            if not m: raise SystemExit('unsupported rewrite: '+l)
-            rx,ci,act,code=m.groups()
-            loc={'reject':'http://reject/','reject_dict':'http://reject-dict/','reject_array':'http://reject-array/','reject_img':'http://reject-img/'}[act]
-            if act=='reject' and code=='200': loc='http://reject-200/'
-            rw.append(('(?i)' if ci else '')+rx.replace('\\/','/'))
-            rw[-1]=(rw[-1],loc)
+            if m:
+                rx,ci,act,code=m.groups()
+                loc={'reject':'http://reject/','reject_dict':'http://reject-dict/','reject_array':'http://reject-array/','reject_img':'http://reject-img/'}[act]
+                if act=='reject' and code=='200': loc='http://reject-200/'
+                rw.append((rxfix(rx,ci),loc)); continue
+            m=re.match(r'^response if \$\{url\} ~= /(.+)/(i?) then response\.json\.delete\((.+)\)$',l)
+            if m:
+                rx,ci,arg=m.groups(); paths=json.loads(arg); paths=[paths] if isinstance(paths,str) else paths
+                body.append(('response_jq',rxfix(rx,ci),'del('+', '.join('.'+x for x in paths)+')')); continue
+            m=re.match(r'^response if \$\{url\} ~= /(.+)/(i?) then response\.json\.jq\((".*")\)$',l)
+            if m:
+                rx,ci,arg=m.groups(); body.append(('response_jq',rxfix(rx,ci),json.loads(arg))); continue
+            m=re.match(r'^response if \$\{url\} ~= /(.+)/(i?) then response\.body\.replace\(/(.+)/, (".*")\)$',l)
+            if m:
+                rx,ci,find,rep=m.groups(); body.append(('response_regex',rxfix(rx,ci),find,json.loads(rep))); continue
+            raise SystemExit('unsupported rewrite: '+l)
+        elif sec=='Script':
+            m=re.match(r'^(request|response) if \$\{url\} ~= /(.+)/(i?) then script\("([^"]+)"\)(?: with (.*))?$',l)
+            if not m: raise SystemExit('unsupported script: '+l)
+            kind,rx,ci,url,opts=m.groups(); opts=opts or ''
+            tg=re.search(r'tag="([^"]+)"',opts)
+            scripts.append(('http_'+kind,(tg.group(1) if tg else url.rsplit('/',1)[-1]),rxfix(rx,ci),url,'requires_body=true' in opts))
         elif sec=='MitM':
             hosts+= [h.strip() for h in l.split('=',1)[1].split(',') if h.strip()]
-    o=f"name: {q(name)}\ndescription: {q(desc)}\nauthor: {q(author)}\nicon: {q(icon)}\n\nrules:\n"
+    o=f"name: {q(name)}\ndescription: {q(desc)}\nauthor: {q(author)}\nicon: {q(icon)}\n"+("\nrules:\n" if rules else "")
     for r in rules:
         if r[0]=='simple':
             _,k,v,pol,nr=r
@@ -75,6 +92,15 @@ def convert(src,name,desc,author,icon,dedupe=True,drop=()):
     if rw:
         o+="\nurl_rewrites:\n"
         for rx,loc in rw: o+=f"  - match: {q(rx)}\n    location: {q(loc)}\n"
+    if body:
+        o+="\nbody_rewrites:\n"
+        for b in body:
+            if b[0]=='response_jq': o+=f"  - response_jq:\n      match: {q(b[1])}\n      filter: {q(b[2])}\n"
+            else: o+=f"  - response_regex:\n      match: {q(b[1])}\n      find: {q(b[2])}\n      replace: {q(b[3])}\n"
+    if scripts:
+        o+="\nscriptings:\n"
+        for k,nm,rx,url,rb in scripts:
+            o+=f"  - {k}:\n      name: {q(nm)}\n      match: {q(rx)}\n      script_url: {q(url)}\n"+("      body_required: true\n" if rb else "")
     if hosts:
         o+="\nmitm:\n  hostnames:\n    includes:\n"+''.join(f"      - {q(h)}\n" for h in hosts)
     return o,len(rules),len(rw),stats
@@ -87,14 +113,26 @@ MODULES=[
        desc="拦截常见 HTTPDNS 服务，让 App 走 Egern 的 DNS，所有去广告模块的依赖，请排在最前。源自可莉 Block_HTTPDNS.lpx（{date}），每周由 GitHub Actions 自动转换并去重。",
        author="可莉, VirgilClyne（Egern 原生版由 Hark 改写）",
        icon="https://raw.githubusercontent.com/luestr/IconResource/main/Other_icon/120px/HTTPDNS.png",
-       drop=("186.76.76.200/32",),
+       drop=("186.76.76.200/32",), min_rules=20,
        extra_hosts=("ucdc-upaas.uc.cn","ucdc1-upaas.uc.cn","ucdc2-upaas.uc.cn","gslbali.ximalaya.com","cdn.wup.huya.com")),
   dict(url="https://kelee.one/Tool/Loon/Lpx/BlockAdvertisers.lpx", out="BlockAdvertisers-hark.yaml",
        name="广告平台拦截器",
        desc="拦截腾讯、字节、快手、百度、阿里、Google、AppLovin、Unity 等广告平台的请求，去广告模块的依赖，请排在最前。源自可莉 BlockAdvertisers.lpx（{date}），每周由 GitHub Actions 自动转换并去重。",
        author="可莉（Egern 原生版由 Hark 改写）",
        icon="https://raw.githubusercontent.com/luestr/IconResource/main/Website_icon/120px/TencentAd.png",
-       drop=(), extra_hosts=()),
+       drop=(), extra_hosts=(), min_rules=20),
+  dict(url="https://kelee.one/Tool/Loon/Lpx/TXDocs_remove_ads.lpx", out="TXDocs_remove_ads-hark.yaml",
+       name="腾讯文档去广告",
+       desc="移除腾讯文档开屏广告、首页横幅推广。源自可莉 TXDocs_remove_ads.lpx（{date}），每周由 GitHub Actions 自动转换。",
+       author="可莉（Egern 原生版由 Hark 改写）",
+       icon="https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/TXDocs.png",
+       drop=(), extra_hosts=(), min_rules=0, min_rewrites=2),
+  dict(url="https://loon.103516.xyz/Plugin/WeChat.lpx", out="WeChat-hark.yaml",
+       name="微信",
+       desc="微信公众号、小程序去广告以及微信外部链接解锁。源自 loon.103516.xyz WeChat.lpx（{date}，整合可莉等作者规则），每周由 GitHub Actions 自动转换。",
+       author="RuCu6, zZPiglet, blackmatrix7, zirawell, 可莉（Egern 原生版由 Hark 改写）",
+       icon="https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/WeChat.png",
+       drop=(), extra_hosts=(), min_rules=5, min_rewrites=50),
 ]
 
 if __name__=="__main__":
@@ -102,9 +140,9 @@ if __name__=="__main__":
     for m in MODULES:
         req=urllib.request.Request(m["url"],headers={"User-Agent":UA})
         body=urllib.request.urlopen(req,timeout=60).read().decode("utf-8")
-        if "[Rule]" not in body or not body.startswith("#!name"):
+        if not re.match(r"#!name\s*=",body) or ("[Rule]" not in body and "[Rewrite]" not in body):
             sys.exit(f"unexpected content from {m['url']}: {body[:200]!r}")
-        dm=re.search(r"^#!date=(.+)$",body,re.M); date=dm.group(1).strip() if dm else "unknown"
+        dm=re.search(r"^#!date\s*=\s*(.+)$",body,re.M); date=dm.group(1).strip() if dm else "unknown"
         with tempfile.NamedTemporaryFile("w",suffix=".lpx",delete=False,encoding="utf-8") as f:
             f.write(body); tmp=f.name
         o,n,r,s=convert(tmp,m["name"],m["desc"].format(date=date),m["author"],m["icon"],drop=m["drop"])
@@ -114,6 +152,6 @@ if __name__=="__main__":
             have=set(re.findall(r'^      - "([^"]+)"$',o,re.M))
             o+="".join(f'      - "{h}"\n' for h in m["extra_hosts"] if h not in have)
         yaml.safe_load(o)
-        if n<20: sys.exit(f"too few rules ({n}) for {m['out']}, refusing to write")
+        if n<m.get("min_rules",0) or r<m.get("min_rewrites",0): sys.exit(f"too few rules ({n}/{r}) for {m['out']}, refusing to write")
         open(m["out"],"w",encoding="utf-8").write(o)
         print(m["out"],date,n,"rules",r,"rewrites",s)
