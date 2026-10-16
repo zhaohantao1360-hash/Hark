@@ -1,5 +1,5 @@
 name: "HTTPDNS拦截器"
-description: "拦截常见 HTTPDNS 服务，让 App 走 Egern 的 DNS，所有去广告模块的依赖，请排在最前。源自可莉 Block_HTTPDNS.lpx（2026-10-02），Egern 原生版由 Hark 改写并去重。"
+description: "拦截常见 HTTPDNS 服务，让 App 走 Egern 的 DNS，所有去广告模块的依赖，请排在最前。源自可莉 Block_HTTPDNS.lpx（2026-10-02 13:57:49），每周由 GitHub Actions 自动转换并去重。"
 author: "可莉, VirgilClyne（Egern 原生版由 Hark 改写）"
 icon: "https://raw.githubusercontent.com/luestr/IconResource/main/Other_icon/120px/HTTPDNS.png"
 
@@ -443,9 +443,9 @@ mitm:
     includes:
       - "appconf.mail.163.com"
       - "msglb.91160.com"
+      - "ucdc2-upaas.uc.cn"
+      - "gw-cn.jiaoliuqu.com"
       - "ucdc-upaas.uc.cn"
       - "ucdc1-upaas.uc.cn"
-      - "ucdc2-upaas.uc.cn"
       - "gslbali.ximalaya.com"
       - "cdn.wup.huya.com"
-      - "gw-cn.jiaoliuqu.com"
