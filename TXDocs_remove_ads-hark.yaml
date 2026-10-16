@@ -1,0 +1,16 @@
+name: "腾讯文档去广告"
+description: "移除腾讯文档开屏广告、首页横幅推广。源自可莉 TXDocs_remove_ads.lpx（2026-10-02 13:57:49），每周由 GitHub Actions 自动转换。"
+author: "可莉（Egern 原生版由 Hark 改写）"
+icon: "https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/TXDocs.png"
+
+url_rewrites:
+  - match: "(?i)^https://tianshu\\.qq\\.com/open/ts_access/GetAds\\?"
+    location: "http://reject-dict/"
+  - match: "(?i)^https://h5\\.qzone\\.qq\\.com/p/adboss/api/json/ts_access/GetAds$"
+    location: "http://reject-dict/"
+
+mitm:
+  hostnames:
+    includes:
+      - "tianshu.qq.com"
+      - "h5.qzone.qq.com"
