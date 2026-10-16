@@ -1,5 +1,5 @@
 name: "广告平台拦截器"
-description: "拦截腾讯、字节、快手、百度、阿里、Google、AppLovin、Unity 等广告平台的请求，去广告模块的依赖，请排在最前。源自可莉 BlockAdvertisers.lpx（2026-10-02），Egern 原生版由 Hark 改写并去重。"
+description: "拦截腾讯、字节、快手、百度、阿里、Google、AppLovin、Unity 等广告平台的请求，去广告模块的依赖，请排在最前。源自可莉 BlockAdvertisers.lpx（2026-10-02 13:57:49），每周由 GitHub Actions 自动转换并去重。"
 author: "可莉（Egern 原生版由 Hark 改写）"
 icon: "https://raw.githubusercontent.com/luestr/IconResource/main/Website_icon/120px/TencentAd.png"
 
