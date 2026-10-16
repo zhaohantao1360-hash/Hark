@@ -39,12 +39,12 @@ env_schema:
 scriptings:
 - generic:
     name: sgcc-hark
-    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/sgcc-hark.js?v=20261014-1155
+    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/sgcc-hark.js?v=20261016-2330
     timeout: 60
 - schedule:
     name: 网上国网定时更新
     cron: '17 */6 * * *'
-    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/sgcc-hark.js?v=20261014-1155
+    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/sgcc-hark.js?v=20261016-2330
     timeout: 60
     env:
       SGCC_SCHEDULE: 'true'
