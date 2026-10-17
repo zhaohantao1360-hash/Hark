@@ -3,283 +3,243 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ZHT | 常用资源入口</title>
-<meta name="description" content="ZHT 的个人收藏夹：Egern 模块、代理配置、AI 与开发工具、购物生活入口。">
-<meta name="theme-color" content="#0b0d12">
+<title>ZHT 收藏夹 · 插件与分流</title>
+<meta name="description" content="ZHT 的 Loon 插件、分流规则、Egern 模块与常用网站，一键安装。">
+<meta name="theme-color" content="#09090b">
 <style>
-:root{
-  --bg:#0b0d12;--bg2:#12151c;--card:rgba(255,255,255,.04);--card-h:rgba(255,255,255,.08);
-  --line:rgba(255,255,255,.08);--text:#e8eaf0;--muted:#8b91a1;--accent:#6ea8fe;--accent2:#b18cff;
-  --radius:14px;
-}
-html[data-theme=light]{
-  --bg:#f4f5f8;--bg2:#ffffff;--card:#ffffff;--card-h:#eef1f7;--line:rgba(0,0,0,.08);
-  --text:#1b1e25;--muted:#6b7180;--accent:#2f6fed;--accent2:#7b4dff;
-}
+:root{--bg:#ffffff;--fg:#09090b;--muted:#71717a;--card:#ffffff;--border:#e4e4e7;--sec:#f4f4f5;--pri:#18181b;--pri-fg:#fafafa;--ring:rgba(24,24,27,.12);--ok:#16a34a}
+html.dark{--bg:#09090b;--fg:#fafafa;--muted:#a1a1aa;--card:#0c0c0f;--border:#27272a;--sec:#18181b;--pri:#fafafa;--pri-fg:#18181b;--ring:rgba(250,250,250,.12);--ok:#4ade80}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue","Microsoft YaHei",sans-serif;
-  background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+html,body{overflow-x:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Inter","Helvetica Neue",sans-serif;background:var(--bg);color:var(--fg);min-height:100vh;-webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
 a{color:inherit;text-decoration:none}
-.layout{display:flex;min-height:100vh}
-/* 侧栏 */
-aside{width:220px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--line);
-  position:sticky;top:0;height:100vh;display:flex;flex-direction:column;padding:22px 14px}
-.brand{display:flex;align-items:center;gap:10px;padding:0 8px 18px}
-.logo{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:13px;
-  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;letter-spacing:.5px}
-.brand b{font-size:20px;letter-spacing:1px}
-.nav{flex:1;overflow:auto;display:flex;flex-direction:column;gap:2px}
-.nav a{padding:9px 12px;border-radius:10px;color:var(--muted);font-size:14px;display:flex;justify-content:space-between}
-.nav a:hover,.nav a.on{background:var(--card-h);color:var(--text)}
-.nav a span{font-size:12px;opacity:.6}
-.side-foot{font-size:12px;color:var(--muted);padding:12px 8px 0;border-top:1px solid var(--line);line-height:1.8}
-.side-btn{display:block;width:100%;text-align:left;background:none;border:0;color:var(--muted);font-size:13px;padding:6px 8px;
-  border-radius:8px;cursor:pointer}
-.side-btn:hover{background:var(--card-h);color:var(--text)}
-/* 主区 */
-main{flex:1;min-width:0;padding:34px 40px 60px}
-.hero{display:flex;flex-direction:column;align-items:center;gap:18px;margin:10px 0 34px}
-.hero h1{font-size:30px;font-weight:800;letter-spacing:.5px}
-.hero h1 em{font-style:normal;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;color:transparent}
-.search{width:100%;max-width:620px;display:flex;background:var(--card);border:1px solid var(--line);border-radius:999px;overflow:hidden}
-.search select{background:transparent;border:0;color:var(--muted);padding:0 6px 0 18px;font-size:14px;outline:none}
-.search input{flex:1;background:transparent;border:0;color:var(--text);font-size:15px;padding:13px 10px;outline:none;min-width:0}
-.search button{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:0;padding:0 22px;font-size:14px;cursor:pointer}
-.tip{font-size:12px;color:var(--muted)}
-section{margin-bottom:34px;scroll-margin-top:20px}
-section h2{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
-section h2::before{content:"";width:4px;height:16px;border-radius:2px;background:linear-gradient(var(--accent),var(--accent2))}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
-.card{position:relative;display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);
-  border-radius:var(--radius);padding:14px;transition:.18s}
-.card:hover{background:var(--card-h);transform:translateY(-2px);border-color:rgba(110,168,254,.35)}
-.ico{width:38px;height:38px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;font-weight:700;font-size:15px;color:#fff;overflow:hidden}
-.ico img{width:100%;height:100%;object-fit:cover;background:#fff}
-.ico.pic{background:#fff!important}
-.ico.emo{background:var(--emo,rgba(127,127,127,.14));font-size:22px}
-.meta{min-width:0}
-.meta b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.meta p{font-size:12px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.del{position:absolute;top:6px;right:8px;border:0;background:none;color:var(--muted);font-size:14px;cursor:pointer;display:none}
-.card.mine:hover .del{display:block}
-.empty{color:var(--muted);font-size:14px;text-align:center;padding:40px 0;display:none}
-footer{text-align:center;color:var(--muted);font-size:12px;margin-top:40px;line-height:1.9}
-/* 弹窗 */
-.mask{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+button{font-family:inherit;color:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.bar{display:flex;align-items:center;gap:14px;height:68px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:17px;white-space:nowrap}
+.logo{width:32px;height:32px;border-radius:9px;background:var(--pri);color:var(--pri-fg);display:grid;place-items:center;font-size:11px;font-weight:800;letter-spacing:.5px}
+.sbtn{flex:1;max-width:340px;margin-left:auto;display:flex;align-items:center;gap:8px;height:38px;padding:0 10px 0 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--muted);font-size:14px;cursor:pointer;text-align:left}
+.sbtn kbd{margin-left:auto;font:500 10px ui-monospace,Menlo,monospace;border:1px solid var(--border);background:var(--sec);border-radius:5px;padding:2px 6px;color:var(--fg)}
+.ibtn{width:38px;height:38px;border:1px solid var(--border);border-radius:10px;background:var(--bg);display:grid;place-items:center;cursor:pointer;flex-shrink:0}
+.ibtn:hover,.sbtn:hover{background:var(--sec)}
+.ibtn svg{width:18px;height:18px}
+.hero{text-align:center;margin:48px 0 26px;animation:up .6s both}
+.hero h1{font-size:clamp(28px,5vw,44px);font-weight:600;letter-spacing:-.02em}
+.hero p{color:var(--muted);max-width:560px;margin:12px auto 0;font-size:16px;line-height:1.6}
+.tabs{display:inline-flex;gap:4px;padding:4px;border-radius:12px;background:var(--sec);margin:0 auto 18px;overflow-x:auto;max-width:100%}
+.tabsw{text-align:center}
+.tab{border:0;background:none;padding:8px 16px;border-radius:9px;font-size:14px;font-weight:500;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tab.on{background:var(--bg);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.tab span{font-size:12px;opacity:.6;margin-left:4px}
+.chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:30px}
+.chip{border:1px solid var(--border);background:var(--bg);border-radius:999px;padding:5px 13px;font-size:13px;color:var(--muted);cursor:pointer}
+.chip.on{background:var(--pri);color:var(--pri-fg);border-color:var(--pri)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(250px,100%),1fr));gap:20px;margin-bottom:60px}
+.card{display:flex;flex-direction:column;min-width:0;overflow:hidden;border:1px solid var(--border);border-radius:16px;background:var(--card);transition:transform .25s,box-shadow .25s,border-color .25s;animation:up .5s both;position:relative}
+.card:hover{transform:translateY(-4px);box-shadow:0 14px 30px -12px var(--ring);border-color:color-mix(in srgb,var(--fg) 22%,var(--border))}
+.card.off{opacity:.62}
+.ch{padding:24px 18px 6px;text-align:center}
+.av{width:64px;height:64px;margin:0 auto 14px;border-radius:50%;background:var(--tint,var(--sec));display:grid;place-items:center;font-weight:600;font-size:22px;overflow:hidden;color:var(--fg)}
+.av img{width:42px;height:42px;object-fit:contain;border-radius:10px}
+.card h3{font-size:18px;font-weight:500;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cb{padding:4px 22px 0;text-align:center;flex:1}
+.cb p{color:var(--muted);font-size:13.5px;line-height:1.5;height:60px;margin-top:4px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.cf{padding:14px 22px 22px;display:flex;flex-direction:column;align-items:center;gap:11px}
+.inst{width:100%;height:40px;border:0;border-radius:10px;background:var(--pri);color:var(--pri-fg);font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:opacity .2s}
+.inst:hover{opacity:.88}
+.inst svg{width:16px;height:16px}
+.more{font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:4px;cursor:pointer;background:none;border:0}
+.more:hover{color:var(--fg)}
+.tag{position:absolute;top:12px;right:12px;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--sec);color:var(--muted)}
+.filters{position:sticky;top:68px;z-index:15;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:10px 0 2px;margin:0 -24px 22px;padding-left:24px;padding-right:24px}
+.filters .tabs{margin-bottom:12px}.filters .chips{margin-bottom:10px}
+.stats{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+.stats span{font-size:12.5px;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:4px 11px}
+.stats b{color:var(--fg);font-weight:600}
+.pill{display:inline-block;margin-top:7px;font-size:11.5px;color:var(--muted);background:var(--sec);border-radius:6px;padding:2px 8px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill.d{color:#16a34a;background:color-mix(in srgb,#16a34a 12%,transparent)}
+.pill.r{color:#dc2626;background:color-mix(in srgb,#dc2626 12%,transparent)}
+.pill.p{color:#2563eb;background:color-mix(in srgb,#2563eb 12%,transparent)}
+html.dark .pill.d{color:#4ade80}html.dark .pill.r{color:#f87171}html.dark .pill.p{color:#60a5fa}
+.chip span{opacity:.55;margin-left:3px;font-size:11px}
+.empty{text-align:center;color:var(--muted);padding:60px 0;display:none}
+footer{border-top:1px solid var(--border);padding:26px 0 40px;color:var(--muted);font-size:13px;text-align:center;line-height:1.9}
+/* 弹层 */
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);z-index:50;display:none;align-items:flex-start;justify-content:center;padding:12vh 16px 16px}
 .mask.show{display:flex}
-.modal{background:var(--bg2);border:1px solid var(--line);border-radius:18px;width:100%;max-width:420px;padding:22px}
-.modal h3{font-size:17px;margin-bottom:14px}
-.modal label{display:block;font-size:12px;color:var(--muted);margin:10px 0 5px}
-.modal input,.modal select,.modal textarea{width:100%;background:var(--card);border:1px solid var(--line);color:var(--text);
-  border-radius:10px;padding:10px 12px;font-size:14px;outline:none;font-family:inherit}
-.modal textarea{height:220px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
-.row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
-.btn{border:0;border-radius:10px;padding:9px 18px;font-size:14px;cursor:pointer;background:var(--card-h);color:var(--text)}
-.btn.pri{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
-.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:9px 18px;border-radius:999px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:60}
+.panel{width:100%;max-width:560px;background:var(--bg);border:1px solid var(--border);border-radius:16px;box-shadow:0 30px 60px -20px rgba(0,0,0,.4);overflow:hidden;animation:pop .18s both}
+.cmdin{display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--border)}
+.cmdin input{flex:1;height:52px;border:0;background:none;color:var(--fg);font-size:15px;outline:none}
+.res{max-height:52vh;overflow:auto;padding:6px}
+.ri{display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:10px;cursor:pointer}
+.ri.sel,.ri:hover{background:var(--sec)}
+.ri .av{width:32px;height:32px;margin:0;font-size:13px}
+.ri .av img{width:22px;height:22px}
+.ri b{font-weight:500;font-size:14px;display:block}
+.ri small{color:var(--muted);font-size:12px}
+.ri em{margin-left:auto;font-style:normal;font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:1px 6px}
+.det{padding:28px 26px 24px;text-align:center}
+.det .av{width:76px;height:76px}
+.det .av img{width:50px;height:50px}
+.det h2{font-size:24px;font-weight:600}
+.det .sub{color:var(--muted);font-size:14px;line-height:1.6;margin:10px 0 18px}
+.kv{text-align:left;border:1px solid var(--border);border-radius:12px;margin-bottom:18px}
+.kv div{display:flex;gap:12px;padding:10px 14px;font-size:13px;border-bottom:1px solid var(--border)}
+.kv div:last-child{border:0}
+.kv span{color:var(--muted);width:56px;flex-shrink:0}
+.kv code{font:12px ui-monospace,Menlo,monospace;word-break:break-all}
+.btns{display:flex;gap:10px}
+.btns .inst{flex:1}
+.ghost{background:var(--sec)!important;color:var(--fg)!important}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--pri);color:var(--pri-fg);padding:9px 18px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:60}
 .toast.show{opacity:1}
-/* 手机 */
-.topbar{display:none}
-@media (max-width:820px){
-  aside{position:fixed;left:0;top:0;z-index:40;transform:translateX(-100%);transition:.25s;box-shadow:0 0 40px rgba(0,0,0,.4)}
-  aside.open{transform:none}
-  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;position:sticky;top:0;z-index:30;
-    background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-  .topbar button{background:none;border:0;color:var(--text);font-size:22px;cursor:pointer}
-  main{padding:20px 16px 50px}
-  .hero h1{font-size:24px}
-  .grid{grid-template-columns:repeat(2,1fr);gap:10px}
-  .card{padding:11px;gap:10px}
-  .ico{width:32px;height:32px;font-size:13px}
-  .meta p{display:none}
+@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+@media (max-width:640px){
+  .wrap{padding:0 16px}.sbtn span,.sbtn kbd{display:none}.sbtn{flex:0 0 38px;width:38px;padding:0;justify-content:center;margin-left:auto}
+  .hero{margin:28px 0 18px}.hero p{font-size:14px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .filters{margin:0 -16px 16px;padding:8px 16px 0}.chips{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.chips::-webkit-scrollbar{display:none}.chip{flex-shrink:0}
+  .tabs{display:flex;width:100%}.tab{flex:1;padding:8px 6px;font-size:13px}
+  .ch{padding:20px 12px 6px}.av{width:52px;height:52px;margin-bottom:10px}.av img{width:34px;height:34px}
+  .card h3{font-size:15px}.cb{padding:0 12px}.cb p{font-size:12px;height:36px;-webkit-line-clamp:2}.pill{font-size:10.5px;margin-top:5px}.more{font-size:12px}.cf{padding:12px 12px 16px}.inst{height:36px;font-size:13px}
+  .tag{top:8px;right:8px;font-size:10px;padding:1px 6px}
+  .mask{padding:8vh 10px 10px}
 }
 </style>
 </head>
 <body>
-<div class="topbar"><button onclick="toggleSide()">☰</button><b>ZHT</b><button onclick="toggleTheme()">◐</button></div>
-<div class="layout">
-<aside id="side">
-  <div class="brand"><div class="logo">ZHT</div><b>ZHT</b></div>
-  <nav class="nav" id="nav"></nav>
-  <div class="side-foot">
-    <button class="side-btn" onclick="openAdd()">＋ 添加网站</button>
-    <button class="side-btn" onclick="openExport()">⇩ 导出配置</button>
-    <button class="side-btn" onclick="toggleTheme()">◐ 切换深浅色</button>
-    <div id="uptime">运行时间计算中…</div>
-    <div>v1.0 © <span id="yr"></span></div>
-  </div>
-</aside>
-<main>
-  <div class="hero">
-    <h1><em>ZHT</em> 的收藏夹</h1>
-    <form class="search" onsubmit="return go(event)">
-      <select id="engine">
-        <option value="local">站内</option>
-        <option value="https://www.bing.com/search?q=">Bing</option>
-        <option value="https://www.baidu.com/s?wd=">百度</option>
-        <option value="https://www.google.com/search?q=">Google</option>
-        <option value="https://github.com/search?q=">GitHub</option>
-        <option value="https://www.perplexity.ai/search?q=">Perplexity</option>
-      </select>
-      <input id="q" placeholder="搜索收藏或全网…" autocomplete="off" oninput="filter()">
-      <button>搜索</button>
-    </form>
-    <div class="tip">选「站内」边输边筛选；选其他引擎回车跳转</div>
-  </div>
-  <div id="list"></div>
-  <div class="empty" id="empty">没有匹配的收藏</div>
-  <footer>
-    版权所有 © <span id="yr2"></span> ZHT · 内容来源于互联网，如有侵权请联系删除<br>
-    自己添加的网站保存在本机浏览器里，用「导出配置」可备份
-  </footer>
-</main>
-</div>
+<header><div class="wrap bar">
+  <a class="brand" href="./"><div class="logo">ZHT</div>ZHT 收藏夹</a>
+  <button class="sbtn" onclick="openCmd()"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>搜索插件、分流、模块…</span><kbd>⌘K</kbd></button>
+  <a class="ibtn" href="https://github.com/zhaohantao1360-hash/Hark" target="_blank" rel="noopener" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.7 1.7.3 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5z"/></svg></a>
+  <button class="ibtn" onclick="toggleTheme()" title="切换主题"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+</div></header>
 
-<div class="mask" id="addMask" onclick="if(event.target===this)close_('addMask')">
-  <div class="modal">
-    <h3>添加网站</h3>
-    <label>分类</label>
-    <select id="fCat" onchange="document.getElementById('fNewWrap').style.display=this.value==='__new'?'block':'none'"></select>
-    <div id="fNewWrap" style="display:none"><label>新分类名称</label><input id="fNew" placeholder="例如：影视"></div>
-    <label>网站名称</label><input id="fName" placeholder="例如：京东">
-    <label>网址 (URL)</label><input id="fUrl" placeholder="https://">
-    <label>自定义图标（选填）</label><input id="fIcon" placeholder="图片链接">
-    <label>描述（选填）</label><input id="fDesc">
-    <div class="row"><button class="btn" onclick="close_('addMask')">取消</button><button class="btn pri" onclick="save()">保存</button></div>
+<main class="wrap">
+  <div class="hero">
+    <h1>ZHT 的插件与分流</h1>
+    <p>我正在用的 Loon 插件、分流规则和 Egern 模块，点「安装」直接导入 App。</p>
+    <div class="stats" id="stats"></div>
   </div>
-</div>
-<div class="mask" id="expMask" onclick="if(event.target===this)close_('expMask')">
-  <div class="modal">
-    <h3>导出配置</h3>
-    <label>复制下方内容，覆盖 index.html 里的 initialData，就能把本机添加的网站永久写进网站</label>
-    <textarea id="expText" readonly></textarea>
-    <div class="row"><button class="btn" onclick="close_('expMask')">关闭</button><button class="btn pri" onclick="copyExp()">复制</button></div>
-  </div>
-</div>
+  <div class="filters"><div class="tabsw"><div class="tabs" id="tabs"></div></div>
+  <div class="chips" id="chips"></div></div>
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty">这个分类下还没有内容</div>
+</main>
+<footer class="wrap">由 ZHT 整理 · 插件与规则版权归原作者<br>© <span id="yr"></span> ZHT</footer>
+
+<div class="mask" id="cmd" onclick="if(event.target===this)hide('cmd')"><div class="panel">
+  <div class="cmdin"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--muted)"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+  <input id="cq" placeholder="搜索插件、分流、模块…" autocomplete="off"></div>
+  <div class="res" id="res"></div>
+</div></div>
+<div class="mask" id="detm" onclick="if(event.target===this)hide('detm')"><div class="panel"><div class="det" id="det"></div></div></div>
 <div class="toast" id="toast"></div>
 
 <script>
-const RAW = "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/";
-const initialData = [
-  {cat:"Egern 模块", items:[
-    {name:"京东去广告 + 比价", url:RAW+"JD-hark.yaml", icon:"jd", desc:"去开屏广告，详情页看历史价"},
-    {name:"Spotify 去广告", url:RAW+"Spotify-hark.yaml", icon:"spotify", desc:"去广告 + 屏蔽 QUIC"},
-    {name:"中国移动 · 仪表盘", url:RAW+"china-mobile-hark-dash.yaml", icon:"cmcc", desc:"话费、流量、语音仪表"},
-    {name:"订阅流量 v2", url:RAW+"sub-traffic-hark-v2.yaml", icon:"traffic", desc:"机场剩余流量与到期"},
-    {name:"油价", url:RAW+"GasPrice-hark.yaml", emoji:"⛽", desc:"92/95/98、调价倒计时"},
-    {name:"彩票开奖", url:RAW+"Lottery-hark.yaml", emoji:"🎱", desc:"开奖、冷热走势"},
-    {name:"网络诊断", url:RAW+"network-radar-hark.yaml", icon:"radar", desc:"延迟、流媒体与 AI 可达性"},
-    {name:"网上国网", url:RAW+"sgcc-hark.yaml", icon:"sgcc", desc:"电费余额、阶梯档位、每日用电"},
-    {name:"网上国网 · 脚本", url:RAW+"sgcc-hark.js", icon:"sgcc", desc:"sgcc-hark.js 脚本源文件"},
-    {name:"Hark 小组件合集", url:"https://zhaohantao1360-hash.github.io/Hark/", icon:"egern", desc:"全部模块说明页"}
-  ]},
-  {cat:"代理配置", items:[
-    {name:"Clash-Config", url:"https://github.com/zhaohantao1360-hash/Clash-Config", icon:"github", desc:"Mihomo 配置仓库"},
-    {name:"Clash Verge Rev", url:"https://github.com/clash-verge-rev/clash-verge-rev", icon:"clashverge", desc:"桌面客户端"},
-    {name:"Egern 文档", url:"https://egernapp.com/docs/intro", icon:"egern", desc:"模块与脚本写法"},
-    {name:"墨魚手記", url:"https://ddgksf2013.top", icon:"ddgksf", desc:"QX 脚本与资源"}
-  ]},
-  {cat:"AI 工具", items:[
-    {name:"ChatGPT", url:"https://chatgpt.com", icon:"chatgpt", desc:"OpenAI"},
-    {name:"Grok", url:"https://grok.com", icon:"grok", desc:"xAI"},
-    {name:"Perplexity", url:"https://www.perplexity.ai", icon:"perplexity", desc:"AI 搜索"},
-    {name:"Cursor", url:"https://cursor.com", icon:"cursor", desc:"AI 编辑器"},
-    {name:"Ollama", url:"https://ollama.com", icon:"ollama", desc:"本地大模型"}
-  ]},
-  {cat:"开发", items:[
-    {name:"GitHub", url:"https://github.com/zhaohantao1360-hash", icon:"github", desc:"我的仓库"},
-    {name:"Cloudflare", url:"https://dash.cloudflare.com", icon:"cloudflare", desc:"域名与 Workers"},
-    {name:"MLH", url:"https://mlh.io", icon:"mlh", desc:"黑客松"}
-  ]},
-  {cat:"购物生活", items:[
-    {name:"京东", url:"https://www.jd.com", icon:"jd", desc:"jd.com"},
-    {name:"淘宝", url:"https://www.taobao.com", icon:"taobao", desc:"taobao.com"},
-    {name:"拼多多", url:"https://mobile.yangkeduo.com", icon:"pdd", desc:"yangkeduo.com"},
-    {name:"DJI 大疆商城", url:"https://store.dji.com/cn", icon:"dji", desc:"官方商城"},
-    {name:"Apple 中国", url:"https://www.apple.com.cn", icon:"apple", desc:"apple.com.cn"}
-  ]}
+const D={"plugins": [{"name": "PingMe签到", "desc": "PingMe 每日自动签到 + 视频奖励。fmz200 原版脚本直引（与 Surge / Egern 一致）。抓参开关打开后进 PingMe App 触发一次余额查询即自动保存签到参数；定时任务默认每天 0 点起每 4 小时运行一次；API 出口策略可在插件参数里切换（默认直连）。", "url": "https://raw.githubusercontent.com/zhaohantao1360-hash/rwmm-vip-scripts/refs/heads/main/PingMeSignin.lpx", "icon": "https://raw.githubusercontent.com/axhani/icon/refs/heads/main/pingme&wetalk.png", "policy": "自建节点", "on": true, "cat": "签到", "author": "fmz200（原版脚本）"}, {"name": "YouTube 增强", "desc": "去除 YouTube 广告，支持后台播放、画中画等增强功能。", "url": "https://rucu6.pages.dev/Plugins/youtube_2.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/YouTube.png", "policy": "", "on": true, "cat": "去广告", "author": ""}, {"name": "让我喵喵 v7", "desc": "会员解锁静默版，逻辑同 v6，去掉系统通知，日常使用。", "url": "https://raw.githubusercontent.com/zhaohantao1360-hash/rwmm-vip-scripts/refs/heads/main/%E8%AE%A9%E6%88%91%E5%96%B5%E5%96%B5v7.lpx", "icon": "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/06jichang/feimiaoyun.png", "policy": "", "on": true, "cat": "会员解锁", "author": "哎呀漫鸭 & AI改写"}, {"name": "腾讯文档去广告", "desc": "移除开屏广告、首页横幅推广。", "url": "https://kelee.one/Tool/Loon/Lpx/TXDocs_remove_ads.lpx", "icon": "https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/TXDocs.png", "policy": "", "on": true, "cat": "去广告", "author": ""}, {"name": "微信增强", "desc": "WeChat及微信广告过滤，解锁微信外部链接。 WeChat用户可在插件内选择分流。", "url": "https://kelvinlab.wuyra.com/Lpx/WeChat_Enhance.lpx", "icon": "https://resource.wuyra.com/Icon/App_icon/120px/WeChat.png", "policy": "DIRECT", "on": true, "cat": "会员解锁", "author": "ld2j[https://github.com/LD2J0618],RuCu6[https://github.com/RuCu6],可莉🅥[https://github.com/luestr/ProxyResource/blob/main/README.md],VirgilClyne,zZPiglet[https://github.com/zZPiglet],wish[https://github.com/mist-whisper],ZenmoFeiShi[https://github.com/ZenmoFeiShi]"}, {"name": "让我喵喵 v6 诊断版", "desc": "每次处理后用系统通知上报 URL 与动作，用于排查广告接口。", "url": "https://raw.githubusercontent.com/zhaohantao1360-hash/rwmm-vip-scripts/refs/heads/main/%E8%AE%A9%E6%88%91%E5%96%B5%E5%96%B5v6.lpx", "icon": "https://raw.githubusercontent.com/fmz200/wool_scripts/main/icons/apps/Crocodile_12.png", "policy": "", "on": false, "cat": "会员解锁", "author": "哎呀漫鸭 & AI改写"}, {"name": "WeTalk自动化任务", "desc": "WeTalk 自动化签到 + 5 次视频奖励；按 email 区分多账号。抓包脚本与定时任务共用同一脚本（内嵌 Env.js，原生支持 Loon，无需转写），script-path 直接引用作者原版，自动同步上游更新。", "url": "https://raw.githubusercontent.com/zhaohantao1360-hash/rwmm-vip-scripts/refs/heads/main/WeTalkSignin.lpx", "icon": "https://play-lh.googleusercontent.com/5ZrUOlwaiR80ExEfuakPVmDeOkXYSwbdv_BisCpt_wd6SLV6NZQyY2LuAcEnK32v2q1eWU8Ga40lBxwH7QGI=w480-h960-rw", "policy": "", "on": true, "cat": "签到", "author": "怎么肥事 & yaowuliu"}, {"name": "Sub-Store", "desc": "高级订阅管理工具，定时任务默认为每天23点55分，可在插件设置中自定义。使用前请在本插件的详情页面为[PROXY]项分配代理策略。", "url": "https://kelee.one/Tool/Loon/Lpx/Sub-Store.lpx", "icon": "https://raw.githubusercontent.com/luestr/IconResource/main/Other_icon/120px/Sub-Store.png", "policy": "兜底后备策略", "on": true, "cat": "工具", "author": ""}, {"name": "广告必须死", "desc": "移除一些小广告，优化一些小功能。", "url": "https://kelvinlab.wuyra.com/Lpx/BlockAds.lpx", "icon": "https://resource.wuyra.com/Icon/Tool_icon/120px/BlockAds.png", "policy": "", "on": true, "cat": "去广告", "author": "RuCu6[https://github.com/RuCu6],fishdown[https://github.com/fishdown],wish[https://github.com/mist-whisper],Repcz[https://github.com/Repcz],kelv1n1n[https://github.com/kelv1n1n],ZenmoFeiShi[https://github.com/ZenmoFeiShi],fmz200[https://github.com/fmz200],可莉🅥[https://github.com/luestr/ProxyResource/blob/main/README.md]"}, {"name": "汽水短剧", "desc": "经 Script-Hub 把 QX 重写转换成 Loon 插件，去广告解锁。", "url": "http://script.hub/file/_start_/https://cdn.jsdelivr.net/gh/WeiGiegie/666@main/qsdj.js/_end_/qsdj.plugin?type=qx-rewrite&target=loon-plugin&del=true&jqEnabled=true", "icon": "", "policy": "", "on": true, "cat": "工具", "author": ""}, {"name": "One", "desc": "One一个 解锁点播去除广告. 最后更新: 2026/10/17 21:18:49 (北京时间)", "url": "https://one-api.zzxu.de/one/one.lpx", "icon": "https://raw.githubusercontent.com/fishdown/Icon/refs/heads/master/app/one.png", "policy": "", "on": true, "cat": "会员解锁", "author": ""}, {"name": "网易邮箱大师去广告", "desc": "移除网易邮箱大师开屏广告、签到任务提醒，精简侧拉抽屉和我的页面。", "url": "https://kelee.one/Tool/Loon/Lpx/MailMaster_remove_ads.lpx", "icon": "https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/MailMaster.png", "policy": "", "on": true, "cat": "签到", "author": ""}, {"name": "拼多多去广告", "desc": "移除开屏广告、底栏多多视频、会场入口、聊天页面精选推荐及推广，精简首页和个人中心。", "url": "https://kelee.one/Tool/Loon/Lpx/PinDuoDuo_remove_ads.lpx", "icon": "https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/PinDuoDuo.png", "policy": "", "on": true, "cat": "去广告", "author": ""}, {"name": "京东去广告", "desc": "移除京东开屏广告，精简我的页面产品推广。", "url": "https://kelee.one/Tool/Loon/Lpx/JD_remove_ads.lpx", "icon": "https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/JD.png", "policy": "", "on": true, "cat": "去广告", "author": ""}, {"name": "京东比价", "desc": "首次使用需安装慢慢买应用，之后点击进入[我的]页面以捕获Cookie，捕获成功后方可在商品详情页面查看比价内容。", "url": "https://kelee.one/Tool/Loon/Lpx/JD_Price.lpx", "icon": "https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/JD.png", "policy": "", "on": true, "cat": "去广告", "author": ""}, {"name": "资源解析器", "desc": "主要用于 Loon 标准订阅，对 URI、Base64 URI 及 Clash/Mihomo YAML 订阅提供支持可能效果会有差异。可设置前后缀、去除 Emoji、文本替换、关键词排序、关键词排除节点、自定义 UA 拉取、TLS ClientHello 指纹修改。支持逐行导入节点与订阅合并后统一处理。不适用于加密订阅，拉取失败或无法处理时回退原订阅，🎈请到订阅管理界面配置解析器。", "url": "https://raw.githubusercontent.com/mc2u/Loon/refs/heads/main/Plugins/loon_resource_parser.lpx", "icon": "https://raw.githubusercontent.com/Loon0x00/Loon0x00.github.io/main/static/img/loon.png", "policy": "", "on": true, "cat": "工具", "author": "mc2u[https://github.com/mc2u],吃白饭的大肥鱼[https://www.deepseek.com]"}, {"name": "Loon 订阅解析器", "desc": "专门用于解析订阅节点的插件, 需 Loon 3.5.0(969)及以上版本. 若需要完整版 Sub-Store, 请使用 Sub-Store Loon 插件 https://raw.githubusercontent.com/sub-store-org/Sub-Store/master/config/Loon.plugin", "url": "https://raw.githubusercontent.com/sub-store-org/Sub-Store/master/config/Loon-parser.plugin", "icon": "https://raw.githubusercontent.com/58xinian/icon/master/Sub-Store1.png", "policy": "", "on": true, "cat": "工具", "author": "Peng-YM"}, {"name": "节点 IP 质量检测 · 混合模式", "desc": "常用单项直接显示原生结果；多项检测进入 Rewrite v2 网页按需选择并合并展示。不修改现有 IP 质量检测插件。", "url": "https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/loon/ipquality-web-test/ipquality-web-test.lpx", "icon": "https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/loon/ipquality-web-test/icon.png", "policy": "", "on": true, "cat": "节点检测", "author": "MaYIHEI[https://github.com/MaYIHEI]"}, {"name": "波点音乐", "desc": "经 Script-Hub 把 QX 重写转换成 Loon 插件，解锁会员功能。", "url": "http://script.hub/file/_start_/https://cdn.jsdelivr.net/gh/WeiGiegie/666@main/bdyy.js/_end_/bdyy.plugin?type=qx-rewrite&target=loon-plugin&del=true&jqEnabled=true", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/BodianMusic.png", "policy": "", "on": true, "cat": "工具", "author": ""}, {"name": "什么值得买", "desc": "过滤什么值得买广告", "url": "https://loon.103516.xyz/Plugin/smzdm.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/ZhiDeMai.png", "policy": "", "on": true, "cat": "去广告", "author": "ZenmoFeiShi[https://github.com/ZenmoFeiShi], 可莉🅥[https://github.com/luestr/ProxyResource/blob/main/README.md]"}, {"name": "Telegram", "desc": "Telegram外部链接跳转，可选目标客户端为Telegram、Swiftgram、Nagram、Turrit、iMe、Nicegram、Lingogram，默认选择Telegram跳转至官方客户端。", "url": "https://loon.103516.xyz/Plugin/Telegram.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/Telegram-01.png", "policy": "香港时延优选", "on": true, "cat": "工具", "author": "sooyaaabo[https://github.com/sooyaaabo]"}, {"name": "GitHub", "desc": "解决GitHub 429请求频繁问题", "url": "https://loon.103516.xyz/Plugin/GitHub.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/GitHub-01.png", "policy": "", "on": true, "cat": "工具", "author": "Yuheng0101[https://github.com/Yuheng0101], sooyaaabo[https://github.com/sooyaaabo]"}, {"name": "节点质量查询", "desc": "适用于Loon的节点质量查询。在节点（策略）页面选择一个节点长按，出现菜单后点击。测试某些出站倾向（使用）IPv6的节点会导致ippure查询不到。由于某些网站是抓取内容分析，可能会偶尔失败。如一直失败请反馈。MaskIP:是否对IP后一半进行打码（需要截图分享则打开）。", "url": "https://raw.githubusercontent.com/Roddy-D/Loon_plugins/refs/heads/main/plugin/iptest.lpx", "icon": "https://raw.githubusercontent.com/Roddy-D/Loon_plugins/refs/heads/main/icon/iptest.png", "policy": "", "on": true, "cat": "节点检测", "author": "Roddy-D[https://github.com/Roddy-D]"}, {"name": "节点阻断检测", "desc": "在节点或策略组页面手动检测节点出口、本机网络与节点服务器的远端 TCP 可达性，辅助判断节点离线或疑似被阻断。", "url": "https://raw.githubusercontent.com/MaYIHEI/paperclip/refs/heads/main/loon/nodecheck/nodecheck.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/Other/NodeTools.png", "policy": "", "on": true, "cat": "节点检测", "author": "RavelloH, MaYIHEI"}, {"name": "Forward", "desc": "解锁Forward Pro，适用于1.3.13及以下版本。", "url": "https://loon.103516.xyz/Plugin/Forward.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/Forward.png", "policy": "自建节点", "on": false, "cat": "会员解锁", "author": "Yu9191[https://github.com/Yu9191]"}, {"name": "BoxJs", "desc": "JavaScript数据管理器，用于管理脚本储存的数据。使用前请在本插件的详情页面为[PROXY]项分配代理策略。", "url": "https://kelee.one/Tool/Loon/Lpx/BoxJs.lpx", "icon": "https://raw.githubusercontent.com/luestr/IconResource/main/Other_icon/120px/BoxJS.png", "policy": "ChatGPT", "on": true, "cat": "工具", "author": ""}, {"name": "WLOC 定位", "desc": "修改 iOS 系统定位（WLOC）。上游地址已 404，当前停用。", "url": "https://raw.githubusercontent.com/Yu9191/wloc/refs/heads/main/modules/wloc.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/Other/Network.png", "policy": "", "on": false, "cat": "去广告", "author": ""}, {"name": "奶茶视频", "desc": "去除全局广告、解锁会员权限", "url": "https://raw.githubusercontent.com/Yuheng0101/X/main/Scripts/NaiCha/loon.plugin", "icon": "https://cdn.jsdelivr.net/gh/Yuheng0101/X@refs/heads/main/Assets/ncsp.png", "policy": "", "on": true, "cat": "会员解锁", "author": "𝐎𝐍𝐙𝟑𝐕"}, {"name": "蛋蛋不语VIP解锁", "desc": "解锁蛋蛋不语VIP会员功能", "url": "https://raw.githubusercontent.com/curtinp118/Loon/main/plugins/dandanvip.lpx", "icon": "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/03CNSoft/cainiaoguoguo.png", "policy": "", "on": true, "cat": "会员解锁", "author": "Curtinp118"}, {"name": "微信外部链接解锁", "desc": "解锁微信外部链接访问限制，跳过中间界面。支付宝链接、被封禁链接进行通知弹窗跳转，在微信中用快照显示被封禁的链接（可选），在微信中进行强制重定向（可选），群聊及扫码均可使用，可选项可在脚本的2~3行更改，也可在BoxJs中更改。", "url": "https://kelee.one/Tool/Loon/Lpx/Weixin_external_links_unlock.lpx", "icon": "https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Weixin.png", "policy": "", "on": true, "cat": "工具", "author": ""}, {"name": "微信小程序去广告", "desc": "收录常用小程序的去广告，作者署名在插件内。", "url": "https://kelee.one/Tool/Loon/Lpx/WexinMiniPrograms_Remove_ads.lpx", "icon": "https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/WeixinMiniPrograms.png", "policy": "", "on": true, "cat": "去广告", "author": ""}, {"name": "AdGuard", "desc": "AdGuard 美区 解锁会员", "url": "https://yfamilys.com/plugin/adguard.plugin", "icon": "https://raw.githubusercontent.com/deezertidal/private/main/icons/adguard.png", "policy": "", "on": true, "cat": "会员解锁", "author": "yqc007"}, {"name": "墨鱼手记页一键添加插件", "desc": "Tab栏显示Loon，代表网页变身成功，即可一键添加插件", "url": "https://ddgksf2013.top/module/ScriptHub.Loon.plugin", "icon": "https://avatars.githubusercontent.com/u/116851128?v=4", "policy": "", "on": true, "cat": "工具", "author": "@ddgksf2013 @小白脸 @xream @keywos @ckyb"}, {"name": "Fuck Telegram bad IPs", "desc": "将 tg 的垃圾 IP 转移到好的 IP 上", "url": "https://raw.githubusercontent.com/Tag36/myrules/refs/heads/main/FKTG.lpx", "icon": "https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Telegram.png", "policy": "", "on": false, "cat": "工具", "author": "mieqq"}, {"name": "番茄小说广告屏蔽", "desc": "屏蔽番茄小说底部和章末广告，且不影响金币获取", "url": "https://raw.githubusercontent.com/honue/rules/master/Loon/plugin/FanQieNovel.plugin", "icon": "https://raw.githubusercontent.com/honue/rules/master/img/fqnovel.png", "policy": "", "on": true, "cat": "去广告", "author": "zqzess honue"}, {"name": "百度网盘", "desc": "过滤百度网盘广告，解锁部分SVIP功能。", "url": "https://loon.103516.xyz/Plugin/BaiduNetDisk.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/BaiduNetDisk.png", "policy": "", "on": true, "cat": "会员解锁", "author": "可莉🅥[https://github.com/luestr/ProxyResource/blob/main/README.md], ddgksf2013[https://github.com/ddgksf2013], chxm1023[https://github.com/chxm1023]"}, {"name": "iRingo:WeatherKit", "desc": "1.解锁全部天气功能；2.替换空气质量数据；3.添加下一小时降水数据；4.添加天气数据。 仅支持iOS 18 & macOS 15 & watchOS 11及以上版本。", "url": "https://loon.103516.xyz/Plugin/iRingo_WeatherKit.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/AppleWeather.png", "policy": "", "on": true, "cat": "会员解锁", "author": "VirgilClyne[https://github.com/VirgilClyne], WordlessEcho[https://github.com/WordlessEcho], 001ProMax[https://github.com/001ProMax]"}, {"name": "WebPage", "desc": "过滤部分网页广告", "url": "https://loon.103516.xyz/Plugin/WebPage.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/Alook.png", "policy": "", "on": true, "cat": "去广告", "author": "RuCu6[https://github.com/RuCu6], kokoryh[https://github.com/kokoryh]"}, {"name": "Loon Gallery", "desc": "Loon插件仓库，一键安装。使用前请在本插件的详情页面为[PROXY]项分配代理策略。", "url": "https://loon.103516.xyz/Plugin/LoonGallery.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/Loon.png", "policy": "", "on": true, "cat": "工具", "author": "Peng-YM[https://github.com/Peng-YM]"}, {"name": "酷我音乐", "desc": "过滤酷我音乐广告，解锁会员功能。 使用前请在BoxJS中添加订阅https://raw.githubusercontent.com/Yuheng0101/X/main/Tasks/boxjs.json并同意相关免责声明，或添加持久化数据「KUWO_AGREE 我同意」。", "url": "https://loon.103516.xyz/Plugin/KuwoMusic.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/KuwoMusic.png", "policy": "", "on": true, "cat": "会员解锁", "author": "可莉🅥[https://github.com/luestr/ProxyResource/blob/main/README.md], Yuheng0101[https://github.com/Yuheng0101]"}, {"name": "Google", "desc": "将Google搜索重定向至.com域名，如遇频繁跳转请禁用本插件。", "url": "https://loon.103516.xyz/Plugin/Google.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/Google.png", "policy": "", "on": true, "cat": "工具", "author": "sooyaaabo[https://github.com/sooyaaabo]"}, {"name": "迅雷", "desc": "过滤迅雷广告，解锁部分会员功能。", "url": "https://loon.103516.xyz/Plugin/ThunderCloudDisk.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/ThunderCloudDisk.png", "policy": "", "on": true, "cat": "会员解锁", "author": "可莉🅥[https://github.com/luestr/ProxyResource/blob/main/README.md], Marol62926[https://github.com/Marol62926]"}, {"name": "Spotify", "desc": "过滤Spotify广告，修改插件自定义配置项需要重新登陆方可生效。适用于9.1.14及以下版本。", "url": "https://loon.103516.xyz/Plugin/Spotify.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/Spotify.png", "policy": "", "on": true, "cat": "去广告", "author": "001ProMax[https://github.com/001ProMax], 可莉🅥[https://github.com/luestr/ProxyResource/blob/main/README.md]"}, {"name": "闲鱼", "desc": "过滤闲鱼广告", "url": "https://loon.103516.xyz/Plugin/Goofish.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/Goofish.png", "policy": "", "on": true, "cat": "去广告", "author": "RuCu6[https://github.com/RuCu6], ZenmoFeiShi[https://github.com/ZenmoFeiShi], ishowshu[https://github.com/ishowshu], 可莉🅥[https://github.com/luestr/ProxyResource/blob/main/README.md]"}, {"name": "高德地图", "desc": "过滤高德地图广告", "url": "https://loon.103516.xyz/Plugin/Amap.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/Amap.png", "policy": "", "on": true, "cat": "去广告", "author": "RuCu6[https://github.com/RuCu6], kokoryh[https://github.com/kokoryh], ishowshu[https://github.com/ishowshu], 可莉🅥[https://github.com/luestr/ProxyResource/blob/main/README.md]"}, {"name": "网易云音乐", "desc": "网易云音乐全面净化，可自定义界面样式。", "url": "https://loon.103516.xyz/Plugin/NeteaseMusic.lpx", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/NeteaseMusic.png", "policy": "", "on": true, "cat": "去广告", "author": "RuCu6[https://github.com/RuCu6], Keywos[https://github.com/Keywos], 可莉🅥[https://github.com/luestr/ProxyResource/blob/main/README.md]"}, {"name": "HTTPDNS拦截器", "desc": "此插件是所有去广告插件的依赖，拦截常见的HTTPDNS服务，以确保这些请求都能够在Loon的DNS框架下工作。", "url": "https://kelee.one/Tool/Loon/Lpx/Block_HTTPDNS.lpx", "icon": "https://raw.githubusercontent.com/luestr/IconResource/main/Other_icon/120px/HTTPDNS.png", "policy": "", "on": true, "cat": "工具", "author": ""}, {"name": "广告平台拦截器", "desc": "此插件是所有去广告插件的依赖，只针对广告平台处理。你依然需要安装其他去广告插件来搭配使用，并确保此插件始终排序在顶部。  支持拦截腾讯、字节跳动、快手、百度、邑盟、倍孜、艾狄墨搏、袤博、极光、个推、友盟、阿里巴巴、阿里妈妈、阿里百川、超级汇川、优比客思、秒针、网易、美团、小米、京东、天目、讯飞、泛连、锐讯灵通、聚次方、美数、嗨量、维快网络、变现猫、章鱼、分秒、泰之菩、翼信、快易、数萤技术、方麟、益起、上量优选、新义互联、腾云天下、布里奇、塔酷、丽声、推啊、旺脉、新度博望、新多广告、快易科技、封狐信息、互裕科技、旺脉信息、佳量动力、享点科技、游昆信息、小川科技、旺脉科技、萃弈、泛为、米漫、易量跃动、秒针、贵士移动、星讯、倍业科技、创聚科技、硬核聚视、数因科技、芒拓网络、上海领页、神蓍科技、酷盈、凡提科技、亿帆、作业帮、畅行未来、华夏乐游、邑维、趣小猫、极准网络、元气智广、Google、SupersonicAds、APPSAD、Adjust、Sigmob、TradPlus、Fancy、MedPro、AppLovin、Unity3D、Tapjoy、Liftoff、Vungle、Moloco、Smadex、Tapad、Appier、InMobi、AppsFlyer、AppLovin、Moloco、RayJump、RixEngine、Amazon、Skarb、Amplitude、ToBid、UMS等广告平台的广告请求，更适合iOS平台的应用。", "url": "https://kelee.one/Tool/Loon/Lpx/BlockAdvertisers.lpx", "icon": "https://raw.githubusercontent.com/luestr/IconResource/main/Website_icon/120px/TencentAd.png", "policy": "", "on": true, "cat": "工具", "author": ""}, {"name": "快捷搜索", "desc": "为Safari提供快速切换搜索引擎的能力，在插件列表中点击此插件上的链接查看使用方法。", "url": "https://kelee.one/Tool/Loon/Lpx/QuickSearch.lpx", "icon": "https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Safari.png", "policy": "", "on": true, "cat": "工具", "author": ""}, {"name": "DNS防泄露", "desc": "专为小白设计的DNS防泄露", "url": "https://kelee.one/Tool/Loon/Lpx/Prevent_DNS_Leaks.lpx", "icon": "https://raw.githubusercontent.com/luestr/IconResource/main/Other_icon/120px/Prevent_DNS_Leaks.png", "policy": "兜底后备策略", "on": true, "cat": "工具", "author": ""}, {"name": "节点检测工具", "desc": "适用于Loon的节点检测工具，可进行地理位置、节点解锁、入口落地等查询。请在所有节点页面选择一个节点长按，出现菜单后进行测试。", "url": "https://kelee.one/Tool/Loon/Lpx/Node_detection_tool.lpx", "icon": "https://raw.githubusercontent.com/luestr/IconResource/main/Other_icon/120px/Node_detection_tool.png", "policy": "", "on": true, "cat": "节点检测", "author": ""}, {"name": "Script-Hub", "desc": "将其他工具的Rewrite、Rule和JavaScript资源转换为Loon能识别的格式，使用前请在本插件的详情页面为[PROXY]项分配代理策略。在插件列表中点击此插件上的链接查看使用方法。", "url": "https://kelee.one/Tool/Loon/Lpx/Script-Hub.lpx", "icon": "https://raw.githubusercontent.com/luestr/IconResource/main/Other_icon/120px/Script-Hub.png", "policy": "自建节点", "on": true, "cat": "工具", "author": ""}], "rules": [{"name": "漫画源", "desc": "漫画源域名直连，自建规则。", "url": "https://raw.githubusercontent.com/zhaohantao1360-hash/rwmm-vip-scripts/refs/heads/main/miaomiaofenliu.list", "policy": "DIRECT", "on": true, "cat": "直连", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/Other/Information.png"}, {"name": "Facebook", "desc": "Facebook / Instagram 走 ChatGPT 组的美区节点。", "url": "https://github.com/fmz200/wool_scripts/raw/main/Loon/rule/Facebook.list", "policy": "ChatGPT", "on": true, "cat": "代理", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/Facebook.png"}, {"name": "MetaAI", "desc": "Meta AI 相关域名，自建规则。", "url": "https://raw.githubusercontent.com/zhaohantao1360-hash/surge-rules/main/MetaAI.list", "policy": "ChatGPT", "on": true, "cat": "代理", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/Meta.png"}, {"name": "网盘分流规则 2", "desc": "资源站域名直连。", "url": "https://raw.githubusercontent.com/eulac-dev/Proxy/refs/heads/main/Loon/Rules/ResourceSite.lsr", "policy": "DIRECT", "on": true, "cat": "直连", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/115NetDisk-01.png"}, {"name": "网盘分流规则", "desc": "各大网盘与视频点播直连。", "url": "https://raw.githubusercontent.com/eulac-dev/Proxy/refs/heads/main/Loon/Rules/PanVod.lsr", "policy": "DIRECT", "on": true, "cat": "直连", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/BaiduNetDisk.png"}, {"name": "ChinaMedia", "desc": "国内影视音乐平台直连。", "url": "https://raw.githubusercontent.com/Rabbit-Spec/Surge/Master/Rules/ChinaMedia.list", "policy": "DIRECT", "on": true, "cat": "直连", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/Other/CNY.png"}, {"name": "China", "desc": "国内常用域名直连。", "url": "https://raw.githubusercontent.com/Rabbit-Spec/Surge/Master/Rules/China.list", "policy": "DIRECT", "on": true, "cat": "直连", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/Other/CNY.png"}, {"name": "ChinaCIDR", "desc": "国内 IP 段直连。", "url": "https://raw.githubusercontent.com/Rabbit-Spec/Surge/Master/Rules/ChinaCIDR.list", "policy": "DIRECT", "on": true, "cat": "直连", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/Other/CNY.png"}, {"name": "apple_update", "desc": "屏蔽 iOS 系统更新检查与下载。", "url": "https://raw.githubusercontent.com/fmz200/wool_scripts/main/Loon/rule/apple_update.list", "policy": "REJECT", "on": true, "cat": "拦截", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/Other/iOS.png"}, {"name": "Spotify", "desc": "Spotify 走美国节点。", "url": "https://rule.kelee.one/Loon/Spotify.lsr", "policy": "美国时延优选", "on": true, "cat": "代理", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/Spotify.png"}, {"name": "Twitter", "desc": "X / Twitter 专用分流。", "url": "https://rule.kelee.one/Loon/Twitter.lsr", "policy": "Twitter", "on": true, "cat": "代理", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/Twitter-01.png"}, {"name": "YouTube", "desc": "YouTube 与 Twitter 组同节点。", "url": "https://rule.kelee.one/Loon/YouTube.lsr", "policy": "Twitter", "on": true, "cat": "代理", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/YouTube.png"}, {"name": "AppleIntelligence", "desc": "Apple Intelligence 走支持地区节点。", "url": "https://raw.githubusercontent.com/ddgksf2013/Filter/refs/heads/master/AppleIntelligence.list", "policy": "Apple Siri 智能", "on": true, "cat": "代理", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/AppleIntelligence-01.png"}, {"name": "Telegram", "desc": "Telegram 域名与 IP 段。", "url": "https://rule.kelee.one/Loon/Telegram.lsr", "policy": "Telegram", "on": true, "cat": "代理", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/Telegram-01.png"}, {"name": "TikTok", "desc": "TikTok 走日本节点。", "url": "https://kelee.one/Tool/Loon/Lsr/TikTok.lsr", "policy": "日本时延优选", "on": true, "cat": "代理", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/TikTok-01.png"}, {"name": "Google", "desc": "Google 全家桶。", "url": "https://rule.kelee.one/Loon/Google.lsr", "policy": "Google", "on": true, "cat": "代理", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/Google.png"}, {"name": "AI", "desc": "ChatGPT、Claude、Gemini 等 AI 服务。", "url": "https://kelee.one/Tool/Loon/Lsr/AI.lsr", "policy": "ChatGPT", "on": true, "cat": "代理", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/ChatGPT-01.png"}, {"name": "Speedtest Intl", "desc": "国际测速站点。", "url": "https://kelee.one/Tool/Loon/Lsr/SpeedtestInternational.lsr", "policy": "Apple Siri 智能", "on": false, "cat": "代理", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/Speedtest.png"}, {"name": "LAN", "desc": "局域网与保留地址直连。", "url": "https://kelee.one/Tool/Loon/Lsr/LAN_SPLITTER.lsr", "policy": "DIRECT", "on": true, "cat": "直连", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/Other/Wi-Fi.png"}, {"name": "CN REGION", "desc": "中国大陆地区 GeoIP 直连。", "url": "https://kelee.one/Tool/Loon/Lsr/REGION_SPLITTER.lsr", "policy": "DIRECT", "on": true, "cat": "直连", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/Other/CNY.png"}, {"name": "AppStore", "desc": "App Store 下载直连。", "url": "https://kelee.one/Tool/Loon/Lsr/AppStore.lsr", "policy": "DIRECT", "on": false, "cat": "直连", "icon": "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/AppStore-01.png"}]};
+const RAW="https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/";
+const EGERN=[
+ ["京东去广告 + 比价","JD-hark.yaml","去开屏广告，商品详情页看慢慢买历史价。","icons/jd.png"],
+ ["Spotify 去广告","Spotify-hark.yaml","去广告并屏蔽 QUIC。","icons/spotify.png"],
+ ["HTTPDNS 拦截器","Block_HTTPDNS-hark.yaml","去广告依赖，拦截常见 HTTPDNS。每周一自动同步上游。",""],
+ ["广告平台拦截器","BlockAdvertisers-hark.yaml","去广告依赖，拦截广告平台 SDK。每周一自动同步上游。",""],
+ ["腾讯文档去广告","TXDocs_remove_ads-hark.yaml","移除开屏广告、首页横幅推广。",""],
+ ["微信增强","WeChat-hark.yaml","微信广告过滤，解锁外部链接。",""],
+ ["中国移动 · 仪表盘","china-mobile-hark-dash.yaml","话费、流量、语音仪表小组件。","icons/cmcc.png"],
+ ["订阅流量 v2","sub-traffic-hark-v2.yaml","机场剩余流量与到期日小组件。","icons/traffic.png"],
+ ["北京油价","GasPrice-hark.yaml","92/95/98 油价与调价倒计时小组件。",""],
+ ["彩票开奖","Lottery-hark.yaml","开奖结果与冷热走势小组件。",""],
+ ["网络诊断","network-radar-hark.yaml","延迟、流媒体与 AI 可达性。","icons/radar.png"],
+ ["网上国网","sgcc-hark.yaml","电费余额、阶梯档位、每日用电。","icons/sgcc.png"]
+].map(([name,f,desc,icon])=>({name,url:RAW+f,desc,icon,on:true,cat:/小组件|电费|诊断/.test(desc)?"小组件":"去广告"}));
+const TABS=[
+ {k:"plugins",t:"插件",items:D.plugins,type:"plugin"},
+ {k:"rules",t:"分流",items:D.rules,type:"rule"},
+ {k:"egern",t:"Egern 模块",items:EGERN,type:"egern"}
 ];
-
-const KEY="zht_custom_v1", START=new Date("2026-10-12T19:40:00+08:00");
-const COLORS=["#6ea8fe","#b18cff","#ff8fa3","#ffb86b","#5fd3a8","#5ec8f2","#f27c5e","#c3a6ff"];
 const $=id=>document.getElementById(id);
-let custom=JSON.parse(localStorage.getItem(KEY)||"[]");
-
-function data(){
-  const d=JSON.parse(JSON.stringify(initialData));
-  custom.forEach((c,i)=>{
-    let g=d.find(x=>x.cat===c.cat); if(!g){g={cat:c.cat,items:[]};d.push(g)}
-    g.items.push({...c,_i:i});
-  });
-  return d;
+const esc=s=>String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let tab=localStorage.getItem("zht2_tab")||"plugins",chip="全部",sel=0,hits=[];
+TABS.forEach(t=>t.items.forEach((it,i)=>{it.type=t.type;it.id=t.k+i}));
+const ALL=TABS.flatMap(t=>t.items);
+const ICO={plugin:'<path d="M14 7V5a2 2 0 1 0-4 0v2H6a1 1 0 0 0-1 1v4h2a2 2 0 1 1 0 4H5v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/>',down:'<path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14"/>',open:'<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>'};
+const svg=(k)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICO[k]}</svg>`;
+const TINT=["#dbeafe","#ede9fe","#fce7f3","#ffedd5","#dcfce7","#cffafe","#fee2e2","#f3e8ff"];
+function avatar(it){
+  const ch=esc([...(it.name||"?")][0]).toUpperCase();
+  const tint=it.icon?"":`style="--tint:${TINT[[...(it.name||"")].reduce((a,c)=>a+c.charCodeAt(0),0)%TINT.length]};color:#18181b"`;
+  return `<div class="av" ${tint}>${it.icon?`<img src="${esc(it.icon)}" loading="lazy" alt="" onerror="this.parentNode.textContent='${ch}'">`:ch}</div>`;
 }
-function host(u){try{return new URL(u).hostname}catch(e){return ""}}
-function esc(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function icon(it){
-  const ch=esc((it.name||"?").trim()[0]).toUpperCase();
-  const col=COLORS[[...(it.name||"")].reduce((a,c)=>a+c.charCodeAt(0),0)%COLORS.length];
-  const h=host(it.url);
-  if(it.emoji) return `<div class="ico emo">${esc(it.emoji)}</div>`;
-  const ic=it.icon||"";
-  const src=ic?(/^(https?:)?\/\//.test(ic)||ic.includes("/")?ic:"icons/"+ic+".png"):(h&&!/raw\.githubusercontent|github\.io/.test(h)?"https://"+h+"/favicon.ico":"");
-  return `<div class="ico${src?" pic":""}" style="background:${col}">${src?`<img src="${esc(src)}" loading="lazy" data-ch="${ch}">`:ch}</div>`;
+function link(it){
+  const u=encodeURIComponent(it.url);
+  if(it.type==="plugin")return "loon://import?plugin="+u;
+  if(it.type==="rule")return "loon://import?rules="+u;
+  if(it.type==="egern")return "egern:/modules/new?name="+encodeURIComponent(it.name)+"&url="+u;
+  return it.url;
+}
+const btnText=it=>innerWidth<640?"安装":it.type==="egern"?"安装到 Egern":"安装到 Loon";
+function pill(it){
+  if(it.type==="rule"){const c=it.policy==="DIRECT"?"d":it.policy==="REJECT"?"r":"p";return `<span class="pill ${c}">${esc(sub(it))}</span>`}
+  return `<span class="pill">${esc(it.cat)}</span>`;
+}
+function sub(it){return it.type==="rule"?(it.policy==="DIRECT"?"直连":it.policy==="REJECT"?"拦截":"走「"+it.policy+"」"):""}
+function renderTabs(){
+  $("tabs").innerHTML=TABS.map(t=>`<button class="tab${t.k===tab?" on":""}" onclick="setTab('${t.k}')">${t.t}<span>${t.items.length}</span></button>`).join("");
+  const T=TABS.find(t=>t.k===tab);const cats=["全部",...new Set(T.items.map(i=>i.cat))];
+  const cnt=c=>c==="全部"?T.items.length:T.items.filter(i=>i.cat===c).length;
+  $("chips").innerHTML=cats.map(c=>`<button class="chip${c===chip?" on":""}" onclick="setChip('${c}')">${c}<span>${cnt(c)}</span></button>`).join("");
 }
 function render(){
-  const d=data();
-  $("nav").innerHTML=d.map((g,i)=>`<a href="#s${i}" onclick="toggleSide(false)">${esc(g.cat)}<span>${g.items.length}</span></a>`).join("");
-  $("list").innerHTML=d.map((g,i)=>`<section id="s${i}"><h2>${esc(g.cat)}</h2><div class="grid">${
-    g.items.map(it=>`<a class="card${it._i!==undefined?" mine":""}" href="${esc(it.url)}" target="_blank" rel="noopener" data-k="${esc((it.name+" "+(it.desc||"")+" "+it.url).toLowerCase())}">
-      ${icon(it)}<div class="meta"><b>${esc(it.name)}</b><p>${esc(it.desc||host(it.url))}</p></div>
-      ${it._i!==undefined?`<button class="del" title="删除" onclick="del(event,${it._i})">✕</button>`:""}</a>`).join("")
-  }</div></section>`).join("");
-  // 图片加载失败时显示首字母
-  document.querySelectorAll(".ico img").forEach(im=>{im.onerror=()=>{const p=im.parentNode;im.remove();p.classList.remove("pic");p.textContent=im.dataset.ch}});
-  $("fCat").innerHTML=d.map(g=>`<option>${esc(g.cat)}</option>`).join("")+`<option value="__new">＋ 新建分类</option>`;
-  filter();
+  renderTabs();
+  const T=TABS.find(t=>t.k===tab);const list=T.items.filter(i=>chip==="全部"||i.cat===chip).sort((a,b)=>b.on-a.on);
+  $("grid").innerHTML=list.map((it,n)=>{
+    const st=it.on?"":`<span class="tag">未启用</span>`;
+    const d=it.desc||sub(it)||"";
+    return `<div class="card${it.on?"":" off"}" style="animation-delay:${Math.min(n,12)*35}ms">${st}
+      <div class="ch">${avatar(it)}<h3>${esc(it.name)}</h3>${pill(it)}</div>
+      <div class="cb"><p>${esc(it.type==="rule"?(it.desc||""):d)}</p></div>
+      <div class="cf"><a class="inst" href="${esc(link(it))}" >${svg("down")}${btnText(it)}</a>
+      <button class="more" onclick="detail('${it.id}')">详情 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button></div></div>`}).join("");
+  $("empty").style.display=list.length?"none":"block";
 }
-function filter(){
-  if($("engine").value!=="local")return;
-  const q=$("q").value.trim().toLowerCase(); let any=false;
-  document.querySelectorAll("section").forEach(s=>{
-    let n=0; s.querySelectorAll(".card").forEach(c=>{const ok=!q||c.dataset.k.includes(q);c.style.display=ok?"":"none";if(ok)n++});
-    s.style.display=n?"":"none"; if(n)any=true;
-  });
-  $("empty").style.display=any?"none":"block";
+function setTab(k){tab=k;chip="全部";localStorage.setItem("zht2_tab",k);render();scrollTo({top:0,behavior:"smooth"})}
+function setChip(c){chip=c;render()}
+function detail(id){
+  const it=ALL.find(x=>x.id===id);if(!it)return;hide("cmd");
+  const rows=[["类型",{plugin:"Loon 插件",rule:"Loon 分流",egern:"Egern 模块"}[it.type]+" · "+it.cat]];
+  if(it.policy)rows.push(["策略",it.policy]);
+  rows.push(["状态",it.on?"启用中":"未启用"]);
+  rows.push(["地址",`<code>${esc(it.url)}</code>`]);
+  $("det").innerHTML=`${avatar(it)}<h2>${esc(it.name)}</h2><p class="sub">${esc(it.desc||sub(it)||"—")}</p>
+   <div class="kv">${rows.map(([k,v])=>`<div><span>${k}</span>${k==="地址"?v:esc(v)}</div>`).join("")}</div>
+   <div class="btns"><a class="inst" href="${esc(link(it))}" >${svg("down")}${btnText(it)}</a>
+   <button class="inst ghost" onclick="copy('${esc(it.url)}')">复制链接</button></div>`;
+  $("detm").classList.add("show");
 }
-function go(e){
-  e.preventDefault(); const v=$("engine").value,q=$("q").value.trim();
-  if(v==="local"){const f=document.querySelector('.card:not([style*="none"])'); if(f&&q)window.open(f.href,"_blank"); return false}
-  if(q)window.open(v+encodeURIComponent(q),"_blank"); return false;
+function copy(t){(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast("已复制"),()=>{const a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();document.execCommand("copy");a.remove();toast("已复制")})}
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),1600)}
+function hide(id){$(id).classList.remove("show")}
+function openCmd(){$("cmd").classList.add("show");$("cq").value="";search();setTimeout(()=>$("cq").focus(),30)}
+const TN={plugin:"插件",rule:"分流",egern:"Egern",site:"网站"};
+function search(){
+  const q=$("cq").value.trim().toLowerCase();
+  hits=ALL.filter(i=>!q||(i.name+" "+(i.desc||"")+" "+(i.policy||"")+" "+i.cat).toLowerCase().includes(q)).slice(0,40);sel=0;drawRes();
 }
-function openAdd(){["fName","fUrl","fIcon","fDesc","fNew"].forEach(i=>$(i).value="");$("fNewWrap").style.display="none";$("addMask").classList.add("show");toggleSide(false)}
-function close_(id){$(id).classList.remove("show")}
-function save(){
-  let cat=$("fCat").value==="__new"?$("fNew").value.trim():$("fCat").value;
-  let url=$("fUrl").value.trim(), name=$("fName").value.trim();
-  if(!cat||!name||!url)return toast("分类、名称和网址都要填");
-  if(!/^https?:\/\//.test(url))url="https://"+url;
-  custom.push({cat,name,url,icon:$("fIcon").value.trim(),desc:$("fDesc").value.trim()});
-  localStorage.setItem(KEY,JSON.stringify(custom)); close_("addMask"); render(); toast("已添加");
+function drawRes(){
+  $("res").innerHTML=hits.length?hits.map((it,n)=>`<div class="ri${n===sel?" sel":""}" onclick="detail('${it.id}')">${avatar(it)}<div><b>${esc(it.name)}</b><small>${esc((it.desc||sub(it)||"").slice(0,34))}</small></div><em>${TN[it.type]}</em></div>`).join(""):'<div style="padding:30px;text-align:center;color:var(--muted);font-size:14px">没有找到</div>';
 }
-function del(e,i){e.preventDefault();e.stopPropagation();if(!confirm("删除这个网站？"))return;custom.splice(i,1);localStorage.setItem(KEY,JSON.stringify(custom));render()}
-function openExport(){
-  const d=data().map(g=>({cat:g.cat,items:g.items.map(({_i,...r})=>{Object.keys(r).forEach(k=>!r[k]&&delete r[k]);return r})}));
-  $("expText").value="const initialData = "+JSON.stringify(d,null,2)+";";
-  $("expMask").classList.add("show");toggleSide(false);
-}
-function copyExp(){const t=$("expText");t.select();(navigator.clipboard?navigator.clipboard.writeText(t.value):Promise.reject()).then(()=>toast("已复制"),()=>{document.execCommand("copy");toast("已复制")})}
-function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),1800)}
-function toggleSide(v){const s=$("side");s.classList.toggle("open",v===undefined?!s.classList.contains("open"):v)}
-function toggleTheme(){const h=document.documentElement,n=h.dataset.theme==="light"?"dark":"light";h.dataset.theme=n;localStorage.setItem("zht_theme",n)}
-function uptime(){
-  let s=Math.max(0,Math.floor((Date.now()-START)/1000));
-  const d=Math.floor(s/86400);s%=86400;const h=Math.floor(s/3600);s%=3600;const m=Math.floor(s/60);s%=60;
-  $("uptime").textContent=`已运行 ${d} 天 ${h} 时 ${m} 分 ${s} 秒`;
-}
-document.documentElement.dataset.theme=localStorage.getItem("zht_theme")||"dark";
-$("yr").textContent=$("yr2").textContent=new Date().getFullYear();
-$("engine").onchange=()=>{if($("engine").value!=="local")document.querySelectorAll("section,.card").forEach(e=>e.style.display="");else filter()};
-render();uptime();setInterval(uptime,1000);
+$("cq").oninput=search;
+$("cq").onkeydown=e=>{if(e.key==="ArrowDown"){sel=Math.min(sel+1,hits.length-1);drawRes();e.preventDefault()}else if(e.key==="ArrowUp"){sel=Math.max(sel-1,0);drawRes();e.preventDefault()}else if(e.key==="Enter"&&hits[sel])detail(hits[sel].id)};
+document.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openCmd()}if(e.key==="Escape"){hide("cmd");hide("detm")}});
+function toggleTheme(){const d=document.documentElement.classList.toggle("dark");localStorage.setItem("zht2_theme",d?"dark":"light")}
+const th=localStorage.getItem("zht2_theme");if(th?th==="dark":matchMedia("(prefers-color-scheme: dark)").matches)document.documentElement.classList.add("dark");
+$("yr").textContent=new Date().getFullYear();
+if(!TABS.find(t=>t.k===tab))tab="plugins";
+const on=TABS.flatMap(t=>t.items).filter(i=>i.on).length;
+$("stats").innerHTML=TABS.map(t=>`<span><b>${t.items.length}</b> ${{plugins:"个插件",rules:"条分流",egern:"个 Egern 模块"}[t.k]}</span>`).join("")+`<span><b>${on}</b> 个启用中</span>`;
+render();
 </script>
 </body>
 </html>
