@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ZHT | 常用资源入口</title>
+<meta name="description" content="ZHT 的个人收藏夹：Egern 模块、代理配置、AI 与开发工具、购物生活入口。">
+<meta name="theme-color" content="#0b0d12">
+<style>
+:root{
+  --bg:#0b0d12;--bg2:#12151c;--card:rgba(255,255,255,.04);--card-h:rgba(255,255,255,.08);
+  --line:rgba(255,255,255,.08);--text:#e8eaf0;--muted:#8b91a1;--accent:#6ea8fe;--accent2:#b18cff;
+  --radius:14px;
+}
+html[data-theme=light]{
+  --bg:#f4f5f8;--bg2:#ffffff;--card:#ffffff;--card-h:#eef1f7;--line:rgba(0,0,0,.08);
+  --text:#1b1e25;--muted:#6b7180;--accent:#2f6fed;--accent2:#7b4dff;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.layout{display:flex;min-height:100vh}
+/* 侧栏 */
+aside{width:220px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--line);
+  position:sticky;top:0;height:100vh;display:flex;flex-direction:column;padding:22px 14px}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px 18px}
+.logo{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:13px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;letter-spacing:.5px}
+.brand b{font-size:20px;letter-spacing:1px}
+.nav{flex:1;overflow:auto;display:flex;flex-direction:column;gap:2px}
+.nav a{padding:9px 12px;border-radius:10px;color:var(--muted);font-size:14px;display:flex;justify-content:space-between}
+.nav a:hover,.nav a.on{background:var(--card-h);color:var(--text)}
+.nav a span{font-size:12px;opacity:.6}
+.side-foot{font-size:12px;color:var(--muted);padding:12px 8px 0;border-top:1px solid var(--line);line-height:1.8}
+.side-btn{display:block;width:100%;text-align:left;background:none;border:0;color:var(--muted);font-size:13px;padding:6px 8px;
+  border-radius:8px;cursor:pointer}
+.side-btn:hover{background:var(--card-h);color:var(--text)}
+/* 主区 */
+main{flex:1;min-width:0;padding:34px 40px 60px}
+.hero{display:flex;flex-direction:column;align-items:center;gap:18px;margin:10px 0 34px}
+.hero h1{font-size:30px;font-weight:800;letter-spacing:.5px}
+.hero h1 em{font-style:normal;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;color:transparent}
+.search{width:100%;max-width:620px;display:flex;background:var(--card);border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.search select{background:transparent;border:0;color:var(--muted);padding:0 6px 0 18px;font-size:14px;outline:none}
+.search input{flex:1;background:transparent;border:0;color:var(--text);font-size:15px;padding:13px 10px;outline:none;min-width:0}
+.search button{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:0;padding:0 22px;font-size:14px;cursor:pointer}
+.tip{font-size:12px;color:var(--muted)}
+section{margin-bottom:34px;scroll-margin-top:20px}
+section h2{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+section h2::before{content:"";width:4px;height:16px;border-radius:2px;background:linear-gradient(var(--accent),var(--accent2))}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.card{position:relative;display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius);padding:14px;transition:.18s}
+.card:hover{background:var(--card-h);transform:translateY(-2px);border-color:rgba(110,168,254,.35)}
+.ico{width:38px;height:38px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;font-weight:700;font-size:15px;color:#fff;overflow:hidden}
+.ico img{width:100%;height:100%;object-fit:cover;background:#fff}
+.ico.pic{background:#fff!important}
+.ico.emo{background:var(--emo,rgba(127,127,127,.14));font-size:22px}
+.meta{min-width:0}
+.meta b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta p{font-size:12px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.del{position:absolute;top:6px;right:8px;border:0;background:none;color:var(--muted);font-size:14px;cursor:pointer;display:none}
+.card.mine:hover .del{display:block}
+.empty{color:var(--muted);font-size:14px;text-align:center;padding:40px 0;display:none}
+footer{text-align:center;color:var(--muted);font-size:12px;margin-top:40px;line-height:1.9}
+/* 弹窗 */
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+.mask.show{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--line);border-radius:18px;width:100%;max-width:420px;padding:22px}
+.modal h3{font-size:17px;margin-bottom:14px}
+.modal label{display:block;font-size:12px;color:var(--muted);margin:10px 0 5px}
+.modal input,.modal select,.modal textarea{width:100%;background:var(--card);border:1px solid var(--line);color:var(--text);
+  border-radius:10px;padding:10px 12px;font-size:14px;outline:none;font-family:inherit}
+.modal textarea{height:220px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+.btn{border:0;border-radius:10px;padding:9px 18px;font-size:14px;cursor:pointer;background:var(--card-h);color:var(--text)}
+.btn.pri{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:9px 18px;border-radius:999px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:60}
+.toast.show{opacity:1}
+/* 手机 */
+.topbar{display:none}
+@media (max-width:820px){
+  aside{position:fixed;left:0;top:0;z-index:40;transform:translateX(-100%);transition:.25s;box-shadow:0 0 40px rgba(0,0,0,.4)}
+  aside.open{transform:none}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;position:sticky;top:0;z-index:30;
+    background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+  .topbar button{background:none;border:0;color:var(--text);font-size:22px;cursor:pointer}
+  main{padding:20px 16px 50px}
+  .hero h1{font-size:24px}
+  .grid{grid-template-columns:repeat(2,1fr);gap:10px}
+  .card{padding:11px;gap:10px}
+  .ico{width:32px;height:32px;font-size:13px}
+  .meta p{display:none}
+}
+</style>
+</head>
+<body>
+<div class="topbar"><button onclick="toggleSide()">☰</button><b>ZHT</b><button onclick="toggleTheme()">◐</button></div>
+<div class="layout">
+<aside id="side">
+  <div class="brand"><div class="logo">ZHT</div><b>ZHT</b></div>
+  <nav class="nav" id="nav"></nav>
+  <div class="side-foot">
+    <button class="side-btn" onclick="openAdd()">＋ 添加网站</button>
+    <button class="side-btn" onclick="openExport()">⇩ 导出配置</button>
+    <button class="side-btn" onclick="toggleTheme()">◐ 切换深浅色</button>
+    <div id="uptime">运行时间计算中…</div>
+    <div>v1.0 © <span id="yr"></span></div>
+  </div>
+</aside>
+<main>
+  <div class="hero">
+    <h1><em>ZHT</em> 的收藏夹</h1>
+    <form class="search" onsubmit="return go(event)">
+      <select id="engine">
+        <option value="local">站内</option>
+        <option value="https://www.bing.com/search?q=">Bing</option>
+        <option value="https://www.baidu.com/s?wd=">百度</option>
+        <option value="https://www.google.com/search?q=">Google</option>
+        <option value="https://github.com/search?q=">GitHub</option>
+        <option value="https://www.perplexity.ai/search?q=">Perplexity</option>
+      </select>
+      <input id="q" placeholder="搜索收藏或全网…" autocomplete="off" oninput="filter()">
+      <button>搜索</button>
+    </form>
+    <div class="tip">选「站内」边输边筛选；选其他引擎回车跳转</div>
+  </div>
+  <div id="list"></div>
+  <div class="empty" id="empty">没有匹配的收藏</div>
+  <footer>
+    版权所有 © <span id="yr2"></span> ZHT · 内容来源于互联网，如有侵权请联系删除<br>
+    自己添加的网站保存在本机浏览器里，用「导出配置」可备份
+  </footer>
+</main>
+</div>
+
+<div class="mask" id="addMask" onclick="if(event.target===this)close_('addMask')">
+  <div class="modal">
+    <h3>添加网站</h3>
+    <label>分类</label>
+    <select id="fCat" onchange="document.getElementById('fNewWrap').style.display=this.value==='__new'?'block':'none'"></select>
+    <div id="fNewWrap" style="display:none"><label>新分类名称</label><input id="fNew" placeholder="例如：影视"></div>
+    <label>网站名称</label><input id="fName" placeholder="例如：京东">
+    <label>网址 (URL)</label><input id="fUrl" placeholder="https://">
+    <label>自定义图标（选填）</label><input id="fIcon" placeholder="图片链接">
+    <label>描述（选填）</label><input id="fDesc">
+    <div class="row"><button class="btn" onclick="close_('addMask')">取消</button><button class="btn pri" onclick="save()">保存</button></div>
+  </div>
+</div>
+<div class="mask" id="expMask" onclick="if(event.target===this)close_('expMask')">
+  <div class="modal">
+    <h3>导出配置</h3>
+    <label>复制下方内容，覆盖 index.html 里的 initialData，就能把本机添加的网站永久写进网站</label>
+    <textarea id="expText" readonly></textarea>
+    <div class="row"><button class="btn" onclick="close_('expMask')">关闭</button><button class="btn pri" onclick="copyExp()">复制</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const RAW = "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/";
+const initialData = [
+  {cat:"Egern 模块", items:[
+    {name:"京东去广告 + 比价", url:RAW+"JD-hark.yaml", icon:"jd", desc:"去开屏广告，详情页看历史价"},
+    {name:"Spotify 去广告", url:RAW+"Spotify-hark.yaml", icon:"spotify", desc:"去广告 + 屏蔽 QUIC"},
+    {name:"中国移动 · 仪表盘", url:RAW+"china-mobile-hark-dash.yaml", icon:"cmcc", desc:"话费、流量、语音仪表"},
+    {name:"订阅流量 v2", url:RAW+"sub-traffic-hark-v2.yaml", icon:"traffic", desc:"机场剩余流量与到期"},
+    {name:"油价", url:RAW+"GasPrice-hark.yaml", emoji:"⛽", desc:"92/95/98、调价倒计时"},
+    {name:"彩票开奖", url:RAW+"Lottery-hark.yaml", emoji:"🎱", desc:"开奖、冷热走势"},
+    {name:"网络诊断", url:RAW+"network-radar-hark.yaml", icon:"radar", desc:"延迟、流媒体与 AI 可达性"},
+    {name:"网上国网", url:RAW+"sgcc-hark.yaml", icon:"sgcc", desc:"电费余额、阶梯档位、每日用电"},
+    {name:"网上国网 · 脚本", url:RAW+"sgcc-hark.js", icon:"sgcc", desc:"sgcc-hark.js 脚本源文件"},
+    {name:"Hark 小组件合集", url:"https://zhaohantao1360-hash.github.io/Hark/", icon:"egern", desc:"全部模块说明页"}
+  ]},
+  {cat:"代理配置", items:[
+    {name:"Clash-Config", url:"https://github.com/zhaohantao1360-hash/Clash-Config", icon:"github", desc:"Mihomo 配置仓库"},
+    {name:"Clash Verge Rev", url:"https://github.com/clash-verge-rev/clash-verge-rev", icon:"clashverge", desc:"桌面客户端"},
+    {name:"Egern 文档", url:"https://egernapp.com/docs/intro", icon:"egern", desc:"模块与脚本写法"},
+    {name:"墨魚手記", url:"https://ddgksf2013.top", icon:"ddgksf", desc:"QX 脚本与资源"}
+  ]},
+  {cat:"AI 工具", items:[
+    {name:"ChatGPT", url:"https://chatgpt.com", icon:"chatgpt", desc:"OpenAI"},
+    {name:"Grok", url:"https://grok.com", icon:"grok", desc:"xAI"},
+    {name:"Perplexity", url:"https://www.perplexity.ai", icon:"perplexity", desc:"AI 搜索"},
+    {name:"Cursor", url:"https://cursor.com", icon:"cursor", desc:"AI 编辑器"},
+    {name:"Ollama", url:"https://ollama.com", icon:"ollama", desc:"本地大模型"}
+  ]},
+  {cat:"开发", items:[
+    {name:"GitHub", url:"https://github.com/zhaohantao1360-hash", icon:"github", desc:"我的仓库"},
+    {name:"Cloudflare", url:"https://dash.cloudflare.com", icon:"cloudflare", desc:"域名与 Workers"},
+    {name:"MLH", url:"https://mlh.io", icon:"mlh", desc:"黑客松"}
+  ]},
+  {cat:"购物生活", items:[
+    {name:"京东", url:"https://www.jd.com", icon:"jd", desc:"jd.com"},
+    {name:"淘宝", url:"https://www.taobao.com", icon:"taobao", desc:"taobao.com"},
+    {name:"拼多多", url:"https://mobile.yangkeduo.com", icon:"pdd", desc:"yangkeduo.com"},
+    {name:"DJI 大疆商城", url:"https://store.dji.com/cn", icon:"dji", desc:"官方商城"},
+    {name:"Apple 中国", url:"https://www.apple.com.cn", icon:"apple", desc:"apple.com.cn"}
+  ]}
+];
+
+const KEY="zht_custom_v1", START=new Date("2026-10-12T19:40:00+08:00");
+const COLORS=["#6ea8fe","#b18cff","#ff8fa3","#ffb86b","#5fd3a8","#5ec8f2","#f27c5e","#c3a6ff"];
+const $=id=>document.getElementById(id);
+let custom=JSON.parse(localStorage.getItem(KEY)||"[]");
+
+function data(){
+  const d=JSON.parse(JSON.stringify(initialData));
+  custom.forEach((c,i)=>{
+    let g=d.find(x=>x.cat===c.cat); if(!g){g={cat:c.cat,items:[]};d.push(g)}
+    g.items.push({...c,_i:i});
+  });
+  return d;
+}
+function host(u){try{return new URL(u).hostname}catch(e){return ""}}
+function esc(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function icon(it){
+  const ch=esc((it.name||"?").trim()[0]).toUpperCase();
+  const col=COLORS[[...(it.name||"")].reduce((a,c)=>a+c.charCodeAt(0),0)%COLORS.length];
+  const h=host(it.url);
+  if(it.emoji) return `<div class="ico emo">${esc(it.emoji)}</div>`;
+  const ic=it.icon||"";
+  const src=ic?(/^(https?:)?\/\//.test(ic)||ic.includes("/")?ic:"icons/"+ic+".png"):(h&&!/raw\.githubusercontent|github\.io/.test(h)?"https://"+h+"/favicon.ico":"");
+  return `<div class="ico${src?" pic":""}" style="background:${col}">${src?`<img src="${esc(src)}" loading="lazy" data-ch="${ch}">`:ch}</div>`;
+}
+function render(){
+  const d=data();
+  $("nav").innerHTML=d.map((g,i)=>`<a href="#s${i}" onclick="toggleSide(false)">${esc(g.cat)}<span>${g.items.length}</span></a>`).join("");
+  $("list").innerHTML=d.map((g,i)=>`<section id="s${i}"><h2>${esc(g.cat)}</h2><div class="grid">${
+    g.items.map(it=>`<a class="card${it._i!==undefined?" mine":""}" href="${esc(it.url)}" target="_blank" rel="noopener" data-k="${esc((it.name+" "+(it.desc||"")+" "+it.url).toLowerCase())}">
+      ${icon(it)}<div class="meta"><b>${esc(it.name)}</b><p>${esc(it.desc||host(it.url))}</p></div>
+      ${it._i!==undefined?`<button class="del" title="删除" onclick="del(event,${it._i})">✕</button>`:""}</a>`).join("")
+  }</div></section>`).join("");
+  // 图片加载失败时显示首字母
+  document.querySelectorAll(".ico img").forEach(im=>{im.onerror=()=>{const p=im.parentNode;im.remove();p.classList.remove("pic");p.textContent=im.dataset.ch}});
+  $("fCat").innerHTML=d.map(g=>`<option>${esc(g.cat)}</option>`).join("")+`<option value="__new">＋ 新建分类</option>`;
+  filter();
+}
+function filter(){
+  if($("engine").value!=="local")return;
+  const q=$("q").value.trim().toLowerCase(); let any=false;
+  document.querySelectorAll("section").forEach(s=>{
+    let n=0; s.querySelectorAll(".card").forEach(c=>{const ok=!q||c.dataset.k.includes(q);c.style.display=ok?"":"none";if(ok)n++});
+    s.style.display=n?"":"none"; if(n)any=true;
+  });
+  $("empty").style.display=any?"none":"block";
+}
+function go(e){
+  e.preventDefault(); const v=$("engine").value,q=$("q").value.trim();
+  if(v==="local"){const f=document.querySelector('.card:not([style*="none"])'); if(f&&q)window.open(f.href,"_blank"); return false}
+  if(q)window.open(v+encodeURIComponent(q),"_blank"); return false;
+}
+function openAdd(){["fName","fUrl","fIcon","fDesc","fNew"].forEach(i=>$(i).value="");$("fNewWrap").style.display="none";$("addMask").classList.add("show");toggleSide(false)}
+function close_(id){$(id).classList.remove("show")}
+function save(){
+  let cat=$("fCat").value==="__new"?$("fNew").value.trim():$("fCat").value;
+  let url=$("fUrl").value.trim(), name=$("fName").value.trim();
+  if(!cat||!name||!url)return toast("分类、名称和网址都要填");
+  if(!/^https?:\/\//.test(url))url="https://"+url;
+  custom.push({cat,name,url,icon:$("fIcon").value.trim(),desc:$("fDesc").value.trim()});
+  localStorage.setItem(KEY,JSON.stringify(custom)); close_("addMask"); render(); toast("已添加");
+}
+function del(e,i){e.preventDefault();e.stopPropagation();if(!confirm("删除这个网站？"))return;custom.splice(i,1);localStorage.setItem(KEY,JSON.stringify(custom));render()}
+function openExport(){
+  const d=data().map(g=>({cat:g.cat,items:g.items.map(({_i,...r})=>{Object.keys(r).forEach(k=>!r[k]&&delete r[k]);return r})}));
+  $("expText").value="const initialData = "+JSON.stringify(d,null,2)+";";
+  $("expMask").classList.add("show");toggleSide(false);
+}
+function copyExp(){const t=$("expText");t.select();(navigator.clipboard?navigator.clipboard.writeText(t.value):Promise.reject()).then(()=>toast("已复制"),()=>{document.execCommand("copy");toast("已复制")})}
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),1800)}
+function toggleSide(v){const s=$("side");s.classList.toggle("open",v===undefined?!s.classList.contains("open"):v)}
+function toggleTheme(){const h=document.documentElement,n=h.dataset.theme==="light"?"dark":"light";h.dataset.theme=n;localStorage.setItem("zht_theme",n)}
+function uptime(){
+  let s=Math.max(0,Math.floor((Date.now()-START)/1000));
+  const d=Math.floor(s/86400);s%=86400;const h=Math.floor(s/3600);s%=3600;const m=Math.floor(s/60);s%=60;
+  $("uptime").textContent=`已运行 ${d} 天 ${h} 时 ${m} 分 ${s} 秒`;
+}
+document.documentElement.dataset.theme=localStorage.getItem("zht_theme")||"dark";
+$("yr").textContent=$("yr2").textContent=new Date().getFullYear();
+$("engine").onchange=()=>{if($("engine").value!=="local")document.querySelectorAll("section,.card").forEach(e=>e.style.display="");else filter()};
+render();uptime();setInterval(uptime,1000);
+</script>
+</body>
+</html>
