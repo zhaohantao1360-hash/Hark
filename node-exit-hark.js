@@ -216,7 +216,8 @@ function buildSmall(d) {
       spacer(),
       row([
         T(flag(g.cc), 30, C.text),
-        col([T(g.country, 18, C.text, 'bold'), T(g.city || '—', 11, C.dim, 'medium')], { gap: 0, flex: 1 }),
+        col([T(g.country, 18, C.text, 'bold'), T(g.city || '—', 11, C.dim, 'medium')], { gap: 0 }),
+        spacer(),
       ], { gap: 8 }),
       row([T(g.isp || g.asn || '', 9, C.faint), spacer(), updated(d)], { gap: 3 }),
       spacer(),
@@ -286,11 +287,11 @@ function buildMedium(d) {
 
 function scoreCard(sym, title, big, sub, color, pct) {
   return {
-    type: 'stack', direction: 'column', alignItems: 'start', gap: 4, flex: 1, height: 74,
-    padding: [9, 11], borderRadius: 14, backgroundColor: C.glass,
+    type: 'stack', direction: 'column', alignItems: 'start', gap: 5, flex: 1, height: 84,
+    padding: [10, 12], borderRadius: 14, backgroundColor: C.glass,
     children: [
       row([icon(sym, color, 11), T(title, 10, C.dim, 'medium')]),
-      T(big, 18, color, 'bold'),
+      T(big, 22, color, 'bold'),
       T(sub, 9, C.dim),
       meter(pct, color),
     ],
@@ -301,24 +302,27 @@ function buildLarge(d) {
   const g = d.g;
   const pv = pureView(d.q), rv = riskView(d.q);
   return {
-    type: 'widget', padding: 14, gap: 10, backgroundGradient: bg(),
+    type: 'widget', padding: 16, gap: 0, backgroundGradient: bg(),
     children: [
       row([icon('globe.asia.australia.fill', C.accent, 13), T('节点出口', 13, C.text, 'semibold'), T(d.policy || '分流规则', 10, C.dim), spacer(),
         T(g.stale ? '上次 ·' : '更新', 9, C.faint), updated(d)]),
+      spacer(),
       row([
-        T(flag(g.cc), 44, C.text),
+        T(flag(g.cc), 50, C.text),
         col([
           T(`${g.country}${g.city ? ' · ' + g.city : ''}`, 20, C.text, 'bold'),
           T(g.isp || g.asn || '—', 11, C.dim, 'medium'),
         ], { gap: 2, flex: 1 }),
-        col([T(d.msText, 18, d.msColor, 'bold'), T('延迟', 9, C.faint)], { alignItems: 'end', gap: 1 }),
-      ], { gap: 10 }),
+        col([T(d.msText, 20, d.msColor, 'bold'), T('延迟', 9, C.faint)], { alignItems: 'end', gap: 1 }),
+      ], { gap: 12 }),
+      spacer(),
       row([
         scoreCard('leaf.fill', '纯净度', pv.short, pv.text, pv.color, [10, 35, 65, 100][pv.level] || 10),
         scoreCard('shield.lefthalf.filled', '风险值', Number.isFinite(rv.score) ? String(rv.score) : '—', `${rv.short}${d.q && d.q.ok ? ' · ' + d.q.src : ''}`, rv.color, Number.isFinite(rv.score) ? rv.score : 0),
-      ], { gap: 8, height: 74 }),
+      ], { gap: 8, height: 84 }),
+      spacer(),
       {
-        type: 'stack', direction: 'column', alignItems: 'start', gap: 7, padding: [10, 12], borderRadius: 14, backgroundColor: C.glass,
+        type: 'stack', direction: 'column', alignItems: 'start', gap: 9, padding: [10, 12], borderRadius: 14, backgroundColor: C.glass,
         children: [
           info('number', 'IP', maskIp(g.ip, d.mask)),
           info('server.rack', 'ASN', g.asn || '—'),
@@ -327,7 +331,6 @@ function buildLarge(d) {
           info('cloud.fill', 'CF 网站出口', d.cf.ok ? `${flag(d.cf.cc)} ${ccName(d.cf.cc)}${d.cf.colo ? ' · ' + d.cf.colo : ''}` : '未知'),
         ],
       },
-      spacer(),
     ],
   };
 }
