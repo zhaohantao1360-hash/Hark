@@ -266,7 +266,7 @@ function buildMedium(d) {
           T(g.city || '—', 11, C.dim, 'medium'),
           spacer(3),
           row([T(d.msText, 10, d.msColor, 'semibold'), T('·', 9, C.faint), updated(d)], { gap: 3 }),
-        ], { width: 92, height: 128 }),
+        ], { width: 92, height: 128, alignItems: 'center' }),
         {
           type: 'stack', direction: 'column', alignItems: 'start', gap: 5, flex: 1, height: 128,
           padding: [9, 11], borderRadius: 16, backgroundColor: C.glass,
