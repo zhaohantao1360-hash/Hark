@@ -174,8 +174,10 @@ function bg() {
   };
 }
 
+// 固定显示刷新时刻（不再用会跳秒的相对时间）
 function updated(d) {
-  return { type: 'date', date: new Date(d.staleTs || d.ts).toISOString(), format: 'relative', font: { size: 9 }, textColor: C.faint, maxLines: 1 };
+  const t = new Date(d.staleTs || d.ts);
+  return T(`${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`, 9, C.faint);
 }
 
 function cfLine(d) {
