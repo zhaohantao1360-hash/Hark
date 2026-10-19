@@ -23,7 +23,7 @@ env_schema:
 scriptings:
 - generic:
     name: 节点出口-Hark
-    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/node-exit-hark.js?v=20261019-2225
+    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/node-exit-hark.js?v=20261019-2230
     timeout: 30
 widgets:
 - name: 节点出口-Hark
