@@ -197,21 +197,30 @@ function failWidget(d, small) {
   };
 }
 
+function chip(label, value, color) {
+  return {
+    type: 'stack', direction: 'column', alignItems: 'start', gap: 1, flex: 1, height: 36,
+    padding: [5, 8], borderRadius: 10, backgroundColor: C.glass,
+    children: [T(label, 8, C.dim), T(value, 12, color, 'bold')],
+  };
+}
+
 function buildSmall(d) {
   const g = d.g;
+  const pv = pureView(d.q), rv = riskView(d.q);
   return {
-    type: 'widget', padding: 14, gap: 3, backgroundGradient: bg(),
+    type: 'widget', padding: 12, gap: 4, backgroundGradient: bg(),
     children: [
-      row([icon('globe.asia.australia.fill', C.accent, 12), T(d.policy || '分流规则', 11, C.dim, 'medium'), spacer(),
+      row([icon('globe.asia.australia.fill', C.accent, 12), T(d.policy || '分流规则', 10, C.dim, 'medium'), spacer(),
         T(d.msText, 10, d.msColor, 'semibold')]),
       spacer(),
-      T(flag(g.cc), 34, C.text),
-      T(g.country, 20, C.text, 'bold'),
-      T(g.city || '—', 12, C.dim, 'medium'),
-      T(g.isp || g.asn || '', 10, C.faint),
-      (() => { const pv = pureView(d.q), rv = riskView(d.q); return row([T(pv.short, 9, pv.color, 'semibold'), T('·', 9, C.faint), T(rv.short, 9, rv.color, 'semibold')], { gap: 3 }); })(),
-      spacer(4),
-      row([T(g.stale ? '上次结果 ·' : '更新', 9, C.faint), updated(d)], { gap: 3 }),
+      row([
+        T(flag(g.cc), 30, C.text),
+        col([T(g.country, 18, C.text, 'bold'), T(g.city || '—', 11, C.dim, 'medium')], { gap: 0, flex: 1 }),
+      ], { gap: 8 }),
+      row([T(g.isp || g.asn || '', 9, C.faint), spacer(), updated(d)], { gap: 3 }),
+      spacer(),
+      row([chip('纯净度', pv.short, pv.color), chip('风险', Number.isFinite(rv.score) ? `${rv.score} ${rv.short.replace('风险', '')}` : rv.short, rv.color)], { gap: 6, height: 36 }),
     ],
   };
 }
