@@ -4,6 +4,7 @@
  * 主出口用非 Cloudflare 的接口（ip-api.com，失败再用 ipinfo.io）查询，
  * 这样走 Cloudflare Workers 节点时看到的是真实出口，而不是反代 IP。
  * 另查一次 cloudflare.com/cdn-cgi/trace，显示「Cloudflare 网站」实际走的出口（edgetunnel 的 PROXYIP）。
+ * 纯净度：ip-api 的 hosting/proxy/mobile + proxycheck.io 的 IP 类型；风险：scamalytics 欺诈分（失败用 proxycheck risk）。按 IP 缓存 6 小时。
  * env：POLICY 策略组名（留空按分流规则）；YS 隐藏 IP；TIMEOUT 超时毫秒。
  */
 
@@ -62,7 +63,7 @@ async function probe(ctx) {
   }
 
   async function geo() {
-    const a = await get('http://ip-api.com/json/?lang=zh-CN&fields=status,country,countryCode,regionName,city,isp,org,as,query');
+    const a = await get('http://ip-api.com/json/?lang=zh-CN&fields=status,country,countryCode,regionName,city,isp,org,as,query,proxy,hosting,mobile');
     try {
       const j = JSON.parse(a.body || '{}');
       if (j.status === 'success') {
@@ -70,6 +71,7 @@ async function probe(ctx) {
           ok: true, ip: j.query, cc: j.countryCode, country: j.country || ccName(j.countryCode),
           city: j.city || j.regionName || '', isp: j.isp || j.org || '',
           asn: clean(j.as).split(' ')[0] || '',
+          flags: { proxy: !!j.proxy, hosting: !!j.hosting, mobile: !!j.mobile },
         };
       }
     } catch (_) {}
@@ -97,6 +99,38 @@ async function probe(ctx) {
     return d.loc ? { ok: true, cc: d.loc, colo: d.colo || '', ip: d.ip || '' } : { ok: false };
   }
 
+  // 纯净度 + 风险（按 IP 缓存 6 小时，省免费接口额度）
+  async function quality(g) {
+    if (!g.ok || !g.ip) return { ok: false };
+    const qk = 'node_exit_q_' + g.ip;
+    try { const c = ctx.storage && ctx.storage.getJSON(qk); if (c && Date.now() - c.ts < 6 * 3600000) return c; } catch (_) {}
+    const [pc, sc] = await Promise.all([
+      get(`https://proxycheck.io/v2/${g.ip}?vpn=1&risk=1`),
+      get(`https://scamalytics.com/ip/${g.ip}`),
+    ]);
+    let type = '', pcProxy = false, pcRisk = NaN;
+    try { const j = JSON.parse(pc.body || '{}')[g.ip] || {}; type = clean(j.type); pcProxy = j.proxy === 'yes'; pcRisk = Number(j.risk); } catch (_) {}
+    let score = NaN;
+    const m = (sc.body || '').match(/Fraud Score:\s*(\d+)/i) || (sc.body || '').match(/"score"\s*:\s*"?(\d+)/);
+    if (m) score = Number(m[1]);
+    const src = Number.isFinite(score) ? 'Scamalytics' : 'proxycheck';
+    if (!Number.isFinite(score) && Number.isFinite(pcRisk)) score = pcRisk;
+    const fl = g.flags || {};
+    const t = type.toLowerCase();
+    let kind, pure;
+    if (/residential/.test(t)) { kind = '家宽住宅'; pure = 3; }
+    else if (/wireless|mobile/.test(t) || fl.mobile) { kind = '移动网络'; pure = 3; }
+    else if (fl.hosting || /hosting|data ?cent/.test(t)) { kind = '机房 IDC'; pure = 1; }
+    else if (/business/.test(t)) { kind = '商业宽带'; pure = 2; }
+    else if (type) { kind = type; pure = 2; }
+    else { kind = fl.hosting === false ? '非机房' : '未知'; pure = fl.hosting === false ? 2 : 0; }
+    const proxy = pcProxy || !!fl.proxy;
+    if (proxy && pure > 1) pure -= 1;
+    const q = { ok: true, ts: Date.now(), kind, pure, proxy, score, src };
+    if (type || Number.isFinite(score)) { try { ctx.storage && ctx.storage.setJSON(qk, q); } catch (_) {} }
+    return q;
+  }
+
   const [g, cf, ping] = await Promise.all([geo(), cfTrace(), get('https://www.gstatic.com/generate_204', false)]);
   const alive = ping.status >= 200 && ping.status < 400;
   const res = {
@@ -116,6 +150,7 @@ async function probe(ctx) {
       if (last && last.g) { res.g = { ...last.g, stale: true }; res.cf = last.cf || cf; res.staleTs = last.ts; }
     }
   } catch (_) {}
+  res.q = await quality(res.g);
   return res;
 }
 
@@ -172,6 +207,7 @@ function buildSmall(d) {
       T(g.country, 20, C.text, 'bold'),
       T(g.city || '—', 12, C.dim, 'medium'),
       T(g.isp || g.asn || '', 10, C.faint),
+      (() => { const pv = pureView(d.q), rv = riskView(d.q); return row([T(pv.short, 9, pv.color, 'semibold'), T('·', 9, C.faint), T(rv.short, 9, rv.color, 'semibold')], { gap: 3 }); })(),
       spacer(4),
       row([T(g.stale ? '上次结果 ·' : '更新', 9, C.faint), updated(d)], { gap: 3 }),
     ],
@@ -182,32 +218,105 @@ function info(sym, label, value, color) {
   return row([icon(sym, C.dim, 10), T(label, 10, C.dim), spacer(), T(value, 11, color || C.text, 'medium')], { gap: 4 });
 }
 
+// 纯净度：3 高 / 2 中 / 1 低 / 0 未知
+function pureView(q) {
+  if (!q || !q.ok) return { text: '查询中', short: '—', color: C.faint, level: 0 };
+  const map = { 3: ['纯净', C.ok], 2: ['一般', C.mid], 1: ['较差', C.fail], 0: ['未知', C.faint] };
+  const [lv, color] = map[q.pure] || map[0];
+  return { text: `${q.kind}${q.proxy ? ' · 代理' : ''}`, short: lv, color, level: q.pure };
+}
+function riskView(q) {
+  if (!q || !q.ok || !Number.isFinite(q.score)) return { text: '—', short: '未知', color: C.faint, score: NaN };
+  const s = q.score;
+  const [lv, color] = s <= 25 ? ['低风险', C.ok] : s <= 60 ? ['中风险', C.mid] : ['高风险', C.fail];
+  return { text: `${s} · ${lv}`, short: lv, color, score: s };
+}
+// 小进度条（0-100）
+function meter(pct, color, h = 4) {
+  const p = Math.max(0.04, Math.min(1, pct / 100));
+  return row([
+    { type: 'stack', direction: 'row', flex: p, height: h, borderRadius: h / 2, backgroundColor: color, children: [spacer()] },
+    ...(p < 1 ? [{ type: 'stack', direction: 'row', flex: 1 - p, height: h, borderRadius: h / 2, backgroundColor: C.glass, children: [spacer()] }] : []),
+  ], { gap: 0, height: h });
+}
+
 function buildMedium(d) {
   const g = d.g;
+  const pv = pureView(d.q), rv = riskView(d.q);
   return {
-    type: 'widget', padding: 14, backgroundGradient: bg(),
+    type: 'widget', padding: [12, 12, 12, 14], backgroundGradient: bg(),
     children: [
       row([
         col([
           row([icon('globe.asia.australia.fill', C.accent, 12), T('节点出口', 12, C.text, 'semibold')]),
           spacer(),
-          T(flag(g.cc), 36, C.text),
-          T(g.country, 20, C.text, 'bold'),
-          T(g.city || '—', 12, C.dim, 'medium'),
-          row([T(g.stale ? '上次 ·' : '更新', 9, C.faint), updated(d)], { gap: 3 }),
-        ], { width: 110, height: 120 }),
+          T(flag(g.cc), 32, C.text),
+          T(g.country, 19, C.text, 'bold'),
+          T(g.city || '—', 11, C.dim, 'medium'),
+          spacer(3),
+          row([T(d.msText, 10, d.msColor, 'semibold'), T('·', 9, C.faint), updated(d)], { gap: 3 }),
+        ], { width: 92, height: 128 }),
         {
-          type: 'stack', direction: 'column', alignItems: 'start', gap: 6, flex: 1, height: 120,
-          padding: [10, 12], borderRadius: 16, backgroundColor: C.glass,
+          type: 'stack', direction: 'column', alignItems: 'start', gap: 5, flex: 1, height: 128,
+          padding: [9, 11], borderRadius: 16, backgroundColor: C.glass,
           children: [
             info('point.3.connected.trianglepath.dotted', '策略', d.policy || '分流规则'),
             info('number', 'IP', maskIp(g.ip, d.mask)),
             info('building.2', '运营商', g.isp || g.asn || '—'),
-            info('bolt.horizontal', '延迟', d.msText, d.msColor),
-            T(cfLine(d), 10, C.dim),
+            info('leaf.fill', '纯净度', `${pv.text}`, pv.color),
+            info('shield.lefthalf.filled', '风险', rv.text, rv.color),
+            T(cfLine(d), 9, C.faint),
           ],
         },
       ], { gap: 10, alignItems: 'center' }),
+    ],
+  };
+}
+
+function scoreCard(sym, title, big, sub, color, pct) {
+  return {
+    type: 'stack', direction: 'column', alignItems: 'start', gap: 4, flex: 1, height: 74,
+    padding: [9, 11], borderRadius: 14, backgroundColor: C.glass,
+    children: [
+      row([icon(sym, color, 11), T(title, 10, C.dim, 'medium')]),
+      T(big, 18, color, 'bold'),
+      T(sub, 9, C.dim),
+      meter(pct, color),
+    ],
+  };
+}
+
+function buildLarge(d) {
+  const g = d.g;
+  const pv = pureView(d.q), rv = riskView(d.q);
+  return {
+    type: 'widget', padding: 14, gap: 10, backgroundGradient: bg(),
+    children: [
+      row([icon('globe.asia.australia.fill', C.accent, 13), T('节点出口', 13, C.text, 'semibold'), T(d.policy || '分流规则', 10, C.dim), spacer(),
+        T(g.stale ? '上次 ·' : '更新', 9, C.faint), updated(d)]),
+      row([
+        T(flag(g.cc), 44, C.text),
+        col([
+          T(`${g.country}${g.city ? ' · ' + g.city : ''}`, 20, C.text, 'bold'),
+          T(g.isp || g.asn || '—', 11, C.dim, 'medium'),
+        ], { gap: 2, flex: 1 }),
+        col([T(d.msText, 18, d.msColor, 'bold'), T('延迟', 9, C.faint)], { alignItems: 'end', gap: 1 }),
+      ], { gap: 10 }),
+      row([
+        scoreCard('leaf.fill', '纯净度', pv.short, pv.text, pv.color, [10, 35, 65, 100][pv.level] || 10),
+        scoreCard('shield.lefthalf.filled', '风险值', Number.isFinite(rv.score) ? String(rv.score) : '—', `${rv.short}${d.q && d.q.ok ? ' · ' + d.q.src : ''}`, rv.color, Number.isFinite(rv.score) ? rv.score : 0),
+      ], { gap: 8, height: 74 }),
+      {
+        type: 'stack', direction: 'column', alignItems: 'start', gap: 7, padding: [10, 12], borderRadius: 14, backgroundColor: C.glass,
+        children: [
+          info('number', 'IP', maskIp(g.ip, d.mask)),
+          info('server.rack', 'ASN', g.asn || '—'),
+          info('building.2', '运营商', g.isp || '—'),
+          info('exclamationmark.shield', '代理标记', d.q && d.q.ok ? (d.q.proxy ? '已标记' : '未标记') : '—', d.q && d.q.proxy ? C.mid : C.ok),
+          info('cloud.fill', 'CF 网站出口', d.cf.ok ? `${flag(d.cf.cc)} ${ccName(d.cf.cc)}${d.cf.colo ? ' · ' + d.cf.colo : ''}` : '未知'),
+        ],
+      },
+      spacer(),
     ],
   };
 }
@@ -245,6 +354,7 @@ export default async function (ctx) {
   if (family.startsWith('accessory')) w = buildLock(d, family);
   else if (!d.g.ok) w = failWidget(d, family === 'systemSmall');
   else if (family === 'systemSmall') w = buildSmall(d);
+  else if (family === 'systemLarge' || family === 'systemExtraLarge') w = buildLarge(d);
   else w = buildMedium(d);
   w.refreshAfter = refreshAfter;
   return w;
