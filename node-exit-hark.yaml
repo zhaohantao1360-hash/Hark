@@ -1,0 +1,30 @@
+name: 节点出口（Hark）
+description: 显示所选策略组当前出口的国旗、国家、城市、运营商和延迟；支持小/中号与锁屏
+env_schema:
+  POLICY:
+    name: 代理策略
+    description: 填 Egern 里的策略组名称，默认是你的 Cloudflare 自建节点组；留空按分流规则
+    default_value: Cloudflare Workers 免费
+  YS:
+    name: 隐藏 IP
+    description: 打开时只显示 IP 前两段
+    default_value: 'true'
+    options:
+      - 'true'
+      - 'false'
+  TIMEOUT:
+    name: 超时
+    description: 单次请求超时（毫秒）
+    default_value: '5000'
+    options:
+      - '3000'
+      - '5000'
+      - '8000'
+scriptings:
+- generic:
+    name: 节点出口-Hark
+    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/node-exit-hark.js?v=20261019-1357
+    timeout: 30
+widgets:
+- name: 节点出口-Hark
+  script_name: 节点出口-Hark
