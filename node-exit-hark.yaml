@@ -1,5 +1,5 @@
 name: 节点出口（Hark）
-description: 显示所选策略组当前出口的国旗、国家、城市、运营商和延迟；支持小/中号与锁屏
+description: 显示所选策略组当前出口的国旗、国家、城市、运营商、延迟、IP 纯净度和风险值；支持小/中/大号与锁屏
 env_schema:
   POLICY:
     name: 代理策略
@@ -23,7 +23,7 @@ env_schema:
 scriptings:
 - generic:
     name: 节点出口-Hark
-    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/node-exit-hark.js?v=20261019-1357
+    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/node-exit-hark.js?v=20261019-2215
     timeout: 30
 widgets:
 - name: 节点出口-Hark
