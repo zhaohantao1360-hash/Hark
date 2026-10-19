@@ -312,9 +312,10 @@ function buildLarge(d) {
         col([
           T(`${g.country}${g.city ? ' · ' + g.city : ''}`, 20, C.text, 'bold'),
           T(g.isp || g.asn || '—', 11, C.dim, 'medium'),
-        ], { gap: 2, flex: 1 }),
+        ], { gap: 2 }),
+        spacer(),
         col([T(d.msText, 20, d.msColor, 'bold'), T('延迟', 9, C.faint)], { alignItems: 'end', gap: 1 }),
-      ], { gap: 12 }),
+      ], { gap: 12, height: 58 }),
       spacer(),
       row([
         scoreCard('leaf.fill', '纯净度', pv.short, pv.text, pv.color, [10, 35, 65, 100][pv.level] || 10),
@@ -322,7 +323,7 @@ function buildLarge(d) {
       ], { gap: 8, height: 84 }),
       spacer(),
       {
-        type: 'stack', direction: 'column', alignItems: 'start', gap: 9, padding: [10, 12], borderRadius: 14, backgroundColor: C.glass,
+        type: 'stack', direction: 'column', alignItems: 'start', gap: 8, height: 128, padding: [10, 12], borderRadius: 14, backgroundColor: C.glass,
         children: [
           info('number', 'IP', maskIp(g.ip, d.mask)),
           info('server.rack', 'ASN', g.asn || '—'),
