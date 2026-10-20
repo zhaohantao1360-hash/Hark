@@ -152,8 +152,9 @@ const EGERN=[
  ["北京油价","GasPrice-hark.yaml","92/95/98 油价与调价倒计时小组件。",""],
  ["彩票开奖","Lottery-hark.yaml","开奖结果与冷热走势小组件。",""],
  ["网络诊断","network-radar-hark.yaml","延迟、流媒体与 AI 可达性。","icons/radar.png"],
- ["网上国网","sgcc-hark.yaml","电费余额、阶梯档位、每日用电。","icons/sgcc.png"]
-].map(([name,f,desc,icon])=>({name,url:RAW+f,desc,icon,on:true,cat:/小组件|电费|诊断/.test(desc)?"小组件":"去广告"}));
+ ["网上国网","sgcc-hark.yaml","电费余额、阶梯档位、每日用电。","icons/sgcc.png"],
+ ["每日打卡（Hark）","daily-duty-hark.yaml","上下班打卡、每日安全隐患排查、每周一办进京证提醒，自动识别节假日与调休，到点推送通知。","icons/duty.png"]
+].map(([name,f,desc,icon])=>({name,url:RAW+f,desc,icon,on:true,cat:/小组件|电费|诊断|打卡/.test(desc)?"小组件":"去广告"}));
 const TABS=[
  {k:"plugins",t:"插件",items:D.plugins,type:"plugin"},
  {k:"rules",t:"分流",items:D.rules,type:"rule"},
