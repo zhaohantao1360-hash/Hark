@@ -25,22 +25,26 @@ env_schema:
     name: 上班卡提前提醒（分钟）
     default_value: '10'
     options: ['5', '10', '15', '30']
+mitm:
+  hostnames:
+    includes:
+      - example.com
 scriptings:
 - generic:
     name: 每日打卡-Hark
-    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/daily-duty-hark.js?v=20261020-2140
+    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/daily-duty-hark.js?v=20261020-2150
     timeout: 20
 - schedule:
     name: 每日打卡提醒-Hark
     cron: '*/5 * * * *'
-    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/daily-duty-hark.js?v=20261020-2140
+    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/daily-duty-hark.js?v=20261020-2150
     timeout: 20
     env:
       MODE: notify
 - http_request:
     name: 每日打卡确认-Hark
-    match: ^http://example\.com/__hark_duty
-    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/daily-duty-hark.js?v=20261020-2140
+    match: ^https?://example\.com/__hark_duty
+    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/daily-duty-hark.js?v=20261020-2150
     timeout: 10
 widgets:
 - name: 每日打卡-Hark
