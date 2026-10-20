@@ -24,6 +24,38 @@ const clean = (v) => String(v == null ? '' : v).trim();
 const pad = (n) => String(n).padStart(2, '0');
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const WD = ['日', '一', '二', '三', '四', '五', '六'];
+const TAP = 'http://example.com/__hark_duty';
+const NAMES = { in: '上班打卡', check: '安全隐患排查', out: '下班打卡', jjz: '进京证' };
+function weekKey(d, jd) {
+  const m = new Date(d); m.setHours(12, 0, 0, 0);
+  m.setDate(m.getDate() - ((d.getDay() - jd + 7) % 7));
+  return ymd(m);
+}
+function loadDone(ctx, now, c) {
+  let day = {}, wk = {};
+  try { day = ctx.storage.getJSON(`duty_done_${ymd(now)}`) || {}; } catch (_) {}
+  try { wk = ctx.storage.getJSON(`duty_jjz_${weekKey(now, c.jjzDay)}`) || {}; } catch (_) {}
+  return { ...day, jjz: wk.jjz };
+}
+const hhmm = (ts) => { const t = new Date(ts); return `${pad(t.getHours())}:${pad(t.getMinutes())}`; };
+
+// 点小组件某一行 → Safari 打开 TAP 链接 → Egern 拦截并记录（再点一次撤销）
+function handleTap(ctx, c) {
+  const u = String(ctx.request.url || '');
+  const k = (u.match(/[?&]k=(\w+)/) || [])[1];
+  if (!NAMES[k]) return ctx.respond({ status: 400, body: 'bad' });
+  const now = new Date();
+  const key = k === 'jjz' ? `duty_jjz_${weekKey(now, c.jjzDay)}` : `duty_done_${ymd(now)}`;
+  let o = {};
+  try { o = ctx.storage.getJSON(key) || {}; } catch (_) {}
+  const undo = !!o[k];
+  if (undo) delete o[k]; else o[k] = Date.now();
+  ctx.storage.setJSON(key, o);
+  const msg = undo ? `已撤销「${NAMES[k]}」` : `${NAMES[k]} 已完成 ✓`;
+  const sub = undo ? '再点一次可重新标记' : `${hhmm(Date.now())} 记录`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>每日打卡</title><style>body{margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system;background:#0d1030;color:#fff}h1{font-size:30px;margin:0 0 10px;color:${undo ? '#FF9F0A' : '#30D158'}}p{color:#ebebf599;margin:4px}</style></head><body><h1>${msg}</h1><p>${sub}</p><p>回到桌面即可，小组件稍后刷新</p></body></html>`;
+  return ctx.respond({ status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }, body: html });
+}
 
 function hm(v, def) {
   const m = clean(v).match(/^(\d{1,2})[:：](\d{2})$/);
@@ -87,7 +119,7 @@ async function dayInfo(ctx, d, hcache) {
 
 // ---------- 状态 ----------
 // state: later 未到 / now 该做 / past 已过 / rest 休息
-function buildState(now, c, today) {
+function buildState(now, c, today, done = {}) {
   const m = now.getHours() * 60 + now.getMinutes();
   const items = [];
   if (today.work) {
@@ -118,16 +150,26 @@ function buildState(now, c, today) {
     tip: jjzToday ? '今天要办' : `还剩 ${left} 天`,
     left, jjzToday,
   });
+  for (const it of items) {
+    it.url = `${TAP}?k=${it.id}`;
+    if (done[it.id]) {
+      it.state = 'done';
+      it.tip = it.id === 'jjz' ? `已办 · 剩 ${it.left} 天` : it.id === 'check' ? `已排查 ${hhmm(done[it.id])}` : `已打卡 ${hhmm(done[it.id])}`;
+    } else if (it.state === 'past' && it.id !== 'jjz') {
+      it.state = 'miss'; it.tip = '未确认';
+    } else if (it.id === 'jjz' && !it.jjzToday) {
+      it.state = 'now'; it.tip = '本周还没办';
+    }
+  }
   const focus = items.find((i) => i.state === 'now') || items.find((i) => i.state === 'later') || null;
   return { items, focus, m };
 }
 
 function stateColor(s) {
-  return s === 'now' ? C.now : s === 'later' ? C.dim : C.faint;
+  return s === 'now' ? C.now : s === 'done' ? C.ok : s === 'later' ? C.dim : C.faint;
 }
 function stateSym(it) {
-  if (it.id === 'jjz' && !it.jjzToday) return 'checkmark.seal.fill';
-  return it.state === 'now' ? 'exclamationmark.circle.fill' : it.state === 'later' ? 'clock' : 'checkmark.circle';
+  return it.state === 'done' ? 'checkmark.circle.fill' : it.state === 'now' ? 'circle' : it.state === 'later' ? 'clock' : 'questionmark.circle';
 }
 
 // 下次需要刷新的时刻：每个状态切换点
@@ -137,7 +179,7 @@ function nextRefresh(now, c) {
   const n = pts.filter((p) => p > m).sort((a, b) => a - b)[0];
   const t = at(now, Math.min(n, 24 * 60 - 1));
   if (n >= 24 * 60) t.setTime(t.getTime() + 2 * 60000);
-  return new Date(Math.min(t.getTime(), now.getTime() + 60 * 60000)).toISOString();
+  return new Date(Math.min(t.getTime(), now.getTime() + 15 * 60000)).toISOString();
 }
 
 // ---------- 通知（schedule 模式） ----------
@@ -155,9 +197,10 @@ async function notifyMode(ctx, c) {
   const k = `duty_notified_${ymd(now)}`;
   let done = {};
   try { done = ctx.storage.getJSON(k) || {}; } catch (_) {}
+  const fin = loadDone(ctx, now, c);
   for (const [id, t, title, body] of ev) {
-    if (m >= t && m < t + 15 && !done[id]) {
-      ctx.notify({ title, body });
+    if (m >= t && m < t + 15 && !done[id] && !fin[id]) {
+      ctx.notify({ title, body: `${body}（完成后点这条通知确认）`, action: { type: 'openUrl', url: `${TAP}?k=${id}` } });
       done[id] = 1;
     }
   }
@@ -206,18 +249,18 @@ function focusBlock(st, today, big) {
     f.state === 'later'
       ? row([T(sub, big ? 11 : 10, C.dim), { type: 'date', date: f.target.toISOString(), format: 'relative', font: { size: big ? 11 : 10 }, textColor: C.dim, maxLines: 1, minScale: 0.6 }], { gap: 0 })
       : T(sub, big ? 11 : 10, C.dim),
-  ], { gap: 3 });
+  ], { gap: 3, url: f.url });
 }
 
 function itemRow(it, size = 11) {
-  const col1 = it.id === 'jjz' ? (it.jjzToday ? C.jjz : C.dim) : stateColor(it.state);
+  const col1 = it.state === 'now' && it.id === 'jjz' ? C.jjz : stateColor(it.state);
   return row([
-    icon(it.sym, it.state === 'now' ? (it.id === 'jjz' ? C.jjz : C.now) : C.dim, size),
-    T(it.name, size, it.state === 'past' && it.id !== 'jjz' ? C.dim : C.text, 'medium'),
+    icon(it.sym, it.state === 'now' ? col1 : it.state === 'done' ? C.ok : C.dim, size),
+    T(it.name, size, it.state === 'done' || it.state === 'miss' ? C.dim : C.text, 'medium'),
     spacer(),
     T(it.tip, size - 1, col1, it.state === 'now' ? 'semibold' : 'regular'),
-    icon(stateSym(it), it.id === 'jjz' && !it.jjzToday ? C.ok : col1, size - 1),
-  ], { gap: 5 });
+    icon(stateSym(it), col1, size + 1),
+  ], { gap: 5, url: it.url });
 }
 
 function buildSmall(now, st, today) {
@@ -282,7 +325,7 @@ function buildLarge(now, st, today, week, c) {
       row([
         focusBlock(st, today, true),
         spacer(),
-        col([T(j.jjzToday ? '今天办' : `${j.left} 天`, 20, j.jjzToday ? C.jjz : C.text, 'bold'), T(j.jjzToday ? '进京证' : '进京证剩余', 9, C.faint)], { alignItems: 'end', gap: 1 }),
+        col([T(j.state === 'done' ? `${j.left} 天` : '待办', 20, j.state === 'done' ? C.ok : C.jjz, 'bold'), T(j.state === 'done' ? '进京证剩余' : '进京证', 9, C.faint)], { alignItems: 'end', gap: 1, url: j.url }),
       ], { height: 52 }),
       spacer(),
       {
@@ -305,23 +348,24 @@ function buildLock(now, st, today, family) {
     const j = st.items.find((i) => i.id === 'jjz');
     return {
       type: 'widget', padding: 4, children: [spacer(),
-        { type: 'text', text: j.jjzToday ? '办证' : String(j.left), font: { size: 18, weight: 'bold' }, textAlign: 'center' },
-        { type: 'text', text: j.jjzToday ? '进京证' : '天', font: { size: 9 }, textAlign: 'center' }, spacer()],
+        { type: 'text', text: j.state === 'done' ? String(j.left) : '办证', font: { size: 18, weight: 'bold' }, textAlign: 'center' },
+        { type: 'text', text: j.state === 'done' ? '天' : '进京证', font: { size: 9 }, textAlign: 'center' }, spacer()],
     };
   }
   return {
     type: 'widget', padding: [2, 4], gap: 2,
-    children: st.items.slice(0, 3).map((it) => ({ type: 'text', text: `${it.state === 'now' ? '●' : '○'} ${it.name} ${it.tip}`, font: { size: 12, weight: it.state === 'now' ? 'semibold' : 'regular' }, maxLines: 1, minScale: 0.6 })),
+    children: st.items.slice(0, 3).map((it) => ({ type: 'text', text: `${it.state === 'done' ? '✓' : it.state === 'now' ? '●' : '○'} ${it.name} ${it.tip}`, font: { size: 12, weight: it.state === 'now' ? 'semibold' : 'regular' }, maxLines: 1, minScale: 0.6 })),
   };
 }
 
 export default async function (ctx) {
   const c = cfg(ctx);
+  if (ctx.request) return handleTap(ctx, c);
   if (c.mode === 'notify') return notifyMode(ctx, c);
   const now = new Date();
   const hc = {};
   const today = await dayInfo(ctx, now, hc);
-  const st = buildState(now, c, today);
+  const st = buildState(now, c, today, loadDone(ctx, now, c));
   const family = ctx.widgetFamily || 'systemMedium';
   let w;
   if (family.startsWith('accessory')) w = buildLock(now, st, today, family);
