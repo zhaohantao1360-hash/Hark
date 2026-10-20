@@ -1,0 +1,33 @@
+name: 新建仓库
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 仓库名
+        required: true
+      description:
+        description: 简介
+        required: false
+        default: ""
+      private:
+        description: 是否私有（true/false）
+        required: false
+        default: "false"
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 创建仓库
+        env:
+          GH_TOKEN: ${{ secrets.REPO_TOKEN }}
+          NAME: ${{ inputs.name }}
+          DESC: ${{ inputs.description }}
+          PRIV: ${{ inputs.private }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then echo "缺少 REPO_TOKEN 密钥"; exit 1; fi
+          body=$(jq -n --arg n "$NAME" --arg d "$DESC" --argjson p "$PRIV" '{name:$n,description:$d,private:$p,auto_init:true}')
+          code=$(curl -s -o out.json -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            https://api.github.com/user/repos -d "$body")
+          cat out.json | jq '{full_name, html_url, message}'
+          [ "$code" = "201" ] || exit 1
