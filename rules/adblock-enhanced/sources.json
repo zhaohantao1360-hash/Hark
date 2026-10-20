@@ -1,0 +1,249 @@
+{
+  "version": "2.0.0",
+  "date": "2026-10-20",
+  "source_module_commit": "06d3b490f2c1287992136854df4bea48f0340e0b",
+  "sources": {
+    "hagezi-light": {
+      "source": "https://raw.githubusercontent.com/hagezi/dns-blocklists/1af20e9f7499a9869b54acf600f0a5650bf93e5e/wildcard/light-onlydomains.txt",
+      "source_commit": "1af20e9f7499a9869b54acf600f0a5650bf93e5e",
+      "source_sha256": "ecd37fea9ea54f49871651eba0e8fc15bb818515fe42ed428695004aed09deac",
+      "license": "GPL-3.0-only",
+      "homepage": "https://github.com/hagezi/dns-blocklists",
+      "semantics": "Native suffix entries selected from domain-only wildcard source."
+    },
+    "stevenblack": {
+      "source": "https://raw.githubusercontent.com/StevenBlack/hosts/db80be797ba5c17ba3bfa5094ed94508b41e716f/hosts",
+      "source_commit": "db80be797ba5c17ba3bfa5094ed94508b41e716f",
+      "source_sha256": "af019612ef8c1239762033947cfd70716c1d53dab78541b9d924f1966f2e6170",
+      "license": "MIT",
+      "semantics": "Exact hosts only; never infer suffix scope from a hosts entry."
+    }
+  },
+  "entries": [
+    {
+      "kind": "domain_suffix",
+      "match": "afs.googleadservices.com",
+      "group": "Google 广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "pagead2.googleadservices.com",
+      "group": "Google 广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain",
+      "match": "googleadservices.com",
+      "group": "Google 广告",
+      "source": "stevenblack"
+    },
+    {
+      "kind": "domain",
+      "match": "partner.googleadservices.com",
+      "group": "Google 广告",
+      "source": "stevenblack"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "ads.privacy.qq.com",
+      "group": "腾讯广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "pgdt.gtimg.cn",
+      "group": "腾讯广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "tangram.e.qq.com",
+      "group": "腾讯广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain",
+      "match": "adsfile.qq.com",
+      "group": "腾讯广告",
+      "source": "stevenblack"
+    },
+    {
+      "kind": "domain",
+      "match": "adslvfile.qq.com",
+      "group": "腾讯广告",
+      "source": "stevenblack"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "afd.baidu.com",
+      "group": "百度广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "als.baidu.com",
+      "group": "百度广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "cpro.baidu.com",
+      "group": "百度广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "eclick.baidu.com",
+      "group": "百度广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "mobads-logs.baidu.com",
+      "group": "百度广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "mobads-pre-config.cdn.bcebos.com",
+      "group": "百度广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "mobads.baidu.com",
+      "group": "百度广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain",
+      "match": "adm.baidu.com",
+      "group": "百度广告",
+      "source": "stevenblack"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "adtrack.e.kuaishou.com",
+      "group": "快手广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "gdfp.gifshow.com",
+      "group": "快手广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "open.e.kuaishou.com",
+      "group": "快手广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "cdn.tanx.com",
+      "group": "阿里 Tanx / 汇川广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "click.tanx.com",
+      "group": "阿里 Tanx / 汇川广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "cms.tanx.com",
+      "group": "阿里 Tanx / 汇川广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "df.tanx.com",
+      "group": "阿里 Tanx / 汇川广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "ef-dongfeng.tanx.com",
+      "group": "阿里 Tanx / 汇川广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "et.tanx.com",
+      "group": "阿里 Tanx / 汇川广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "hc-ssp.sm.cn",
+      "group": "阿里 Tanx / 汇川广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "huichuan-mc.sm.cn",
+      "group": "阿里 Tanx / 汇川广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "huichuan.sm.cn",
+      "group": "阿里 Tanx / 汇川广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "ifs.tanx.com",
+      "group": "阿里 Tanx / 汇川广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "kgb-ifs.tanx.com",
+      "group": "阿里 Tanx / 汇川广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "live-ifs.tanx.com",
+      "group": "阿里 Tanx / 汇川广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "opehs.tanx.com",
+      "group": "阿里 Tanx / 汇川广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "p.tanx.com",
+      "group": "阿里 Tanx / 汇川广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "rdstat.tanx.com",
+      "group": "阿里 Tanx / 汇川广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain_suffix",
+      "match": "sdk-config.tanx.com",
+      "group": "阿里 Tanx / 汇川广告",
+      "source": "hagezi-light"
+    },
+    {
+      "kind": "domain",
+      "match": "adservice.google.com",
+      "group": "原版保留",
+      "source": "stevenblack"
+    }
+  ],
+  "skipped_already_covered": 359,
+  "original_module_commit": "41c643fa28ad163822197098a5d0a1abdb77bdb8",
+  "scope": "Only this separately reusable enhancement rule set is GPL-3.0-only. Original Hark files retain their original ownership/licensing."
+}

@@ -106,6 +106,29 @@ def convert(src,name,desc,author,icon,dedupe=True,drop=()):
     return o,len(rules),len(rw),stats
 
 
+# Independently licensed enhancement stays a separate, reusable Egern rule set.
+ADBLOCK_ENHANCEMENT_URL = "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/rules/adblock-enhanced.yaml"
+
+def append_adblock_enhancement(text, output_name):
+    """Append only for BlockAdvertisers, after all original rules (preserve exceptions)."""
+    if output_name != "BlockAdvertisers-hark.yaml":
+        return text
+    marker = '      match: "' + ADBLOCK_ENHANCEMENT_URL + '"'
+    if marker in text:
+        return text
+    rule = ('  # Additional GPL-3.0-only rules are kept in an independent rule-set file.\n'
+            '  - rule_set:\n'
+            + marker + '\n'
+            '      policy: REJECT\n'
+            '      name: "广告增强 v2.0.0"\n'
+            '      update_interval: 86400\n')
+    start = re.search(r'^rules:\s*\n', text, re.M)
+    if start:
+        following = re.search(r'^\S', text[start.end():], re.M)
+        end = start.end() + following.start() if following else len(text)
+        return text[:end].rstrip() + '\n' + rule + '\n' + text[end:]
+    return text.rstrip() + '\n\nrules:\n' + rule
+
 UA="Loon/3.5.1 CFNetwork/1568 Darwin/24.0.0"
 MODULES=[
   dict(url="https://kelee.one/Tool/Loon/Lpx/Block_HTTPDNS.lpx", out="Block_HTTPDNS-hark.yaml",
@@ -151,6 +174,7 @@ if __name__=="__main__":
             if "\nmitm:\n" not in o: o+="\nmitm:\n  hostnames:\n    includes:\n"
             have=set(re.findall(r'^      - "([^"]+)"$',o,re.M))
             o+="".join(f'      - "{h}"\n' for h in m["extra_hosts"] if h not in have)
+        o=append_adblock_enhancement(o,m["out"])
         yaml.safe_load(o)
         if n<m.get("min_rules",0) or r<m.get("min_rewrites",0): sys.exit(f"too few rules ({n}/{r}) for {m['out']}, refusing to write")
         open(m["out"],"w",encoding="utf-8").write(o)

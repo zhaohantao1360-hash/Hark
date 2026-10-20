@@ -1,0 +1,67 @@
+# Full GPL license: https://github.com/zhaohantao1360-hash/Hark/blob/main/rules/adblock-enhanced/LICENSE-GPL-3.0.txt
+# Selected domain entries from StevenBlack/hosts
+# https://raw.githubusercontent.com/StevenBlack/hosts/db80be797ba5c17ba3bfa5094ed94508b41e716f/hosts
+#
+# The MIT License (MIT)
+#
+# Copyright © 2026 Steven Black
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the “Software”), to deal in
+# the Software without restriction, including without limitation the rights to
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+# of the Software, and to permit persons to whom the Software is furnished to do
+# so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+# FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+# SPDX-License-Identifier: GPL-3.0-only
+# Additional independent advertising rules, 2026-10-20.
+# Sources, attribution, editable entries and licenses: ./adblock-enhanced/
+# StevenBlack MIT portions retain their notice in adblock-enhanced/THIRD-PARTY-LICENSE.txt
+domain_suffix_set:
+- afs.googleadservices.com
+- pagead2.googleadservices.com
+- ads.privacy.qq.com
+- pgdt.gtimg.cn
+- tangram.e.qq.com
+- afd.baidu.com
+- als.baidu.com
+- cpro.baidu.com
+- eclick.baidu.com
+- mobads-logs.baidu.com
+- mobads-pre-config.cdn.bcebos.com
+- mobads.baidu.com
+- adtrack.e.kuaishou.com
+- gdfp.gifshow.com
+- open.e.kuaishou.com
+- cdn.tanx.com
+- click.tanx.com
+- cms.tanx.com
+- df.tanx.com
+- ef-dongfeng.tanx.com
+- et.tanx.com
+- hc-ssp.sm.cn
+- huichuan-mc.sm.cn
+- huichuan.sm.cn
+- ifs.tanx.com
+- kgb-ifs.tanx.com
+- live-ifs.tanx.com
+- opehs.tanx.com
+- p.tanx.com
+- rdstat.tanx.com
+- sdk-config.tanx.com
+domain_set:
+- googleadservices.com
+- partner.googleadservices.com
+- adsfile.qq.com
+- adslvfile.qq.com
+- adm.baidu.com
+- adservice.google.com

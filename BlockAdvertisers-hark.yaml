@@ -1025,6 +1025,12 @@ rules:
   - domain:
       match: "ep7.facebook.com"
       policy: REJECT
+  # Additional GPL-3.0-only rules are kept in an independent rule-set file.
+  - rule_set:
+      match: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/rules/adblock-enhanced.yaml"
+      policy: REJECT
+      name: "广告增强 v2.0.0"
+      update_interval: 86400
 
 url_rewrites:
   - match: "(?i)^https://video-dsp\\.pddpic\\.com/market-dsp-video/"
