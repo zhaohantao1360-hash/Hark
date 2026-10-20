@@ -1,5 +1,5 @@
 name: 每日打卡（Hark）
-description: 点一下对应行即标记完成（再点撤销）。上下班打卡、每日安全隐患排查、每周办进京证，按时间提示现在该做什么；自动识别节假日和调休补班，到点推送通知
+description: 上下班打卡、每日安全隐患排查、每周办进京证，按时间提示现在该做什么；自动识别节假日和调休补班，到点推送通知
 env_schema:
   WORK_START:
     name: 上班时间
@@ -25,27 +25,18 @@ env_schema:
     name: 上班卡提前提醒（分钟）
     default_value: '10'
     options: ['5', '10', '15', '30']
-mitm:
-  hostnames:
-    includes:
-      - example.com
 scriptings:
 - generic:
     name: 每日打卡-Hark
-    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/daily-duty-hark.js?v=20261020-2150
+    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/daily-duty-hark.js?v=20261020-2200
     timeout: 20
 - schedule:
     name: 每日打卡提醒-Hark
     cron: '*/5 * * * *'
-    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/daily-duty-hark.js?v=20261020-2150
+    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/daily-duty-hark.js?v=20261020-2200
     timeout: 20
     env:
       MODE: notify
-- http_request:
-    name: 每日打卡确认-Hark
-    match: ^https?://example\.com/__hark_duty
-    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/daily-duty-hark.js?v=20261020-2150
-    timeout: 10
 widgets:
 - name: 每日打卡-Hark
   script_name: 每日打卡-Hark
