@@ -24,7 +24,7 @@ const clean = (v) => String(v == null ? '' : v).trim();
 const pad = (n) => String(n).padStart(2, '0');
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const WD = ['日', '一', '二', '三', '四', '五', '六'];
-const TAP = 'http://example.com/__hark_duty';
+const TAP = 'https://example.com/__hark_duty';
 const NAMES = { in: '上班打卡', check: '安全隐患排查', out: '下班打卡', jjz: '进京证' };
 function weekKey(d, jd) {
   const m = new Date(d); m.setHours(12, 0, 0, 0);
@@ -266,7 +266,7 @@ function itemRow(it, size = 11) {
 function buildSmall(now, st, today) {
   const list = st.items.filter((i) => i !== st.focus).slice(0, 3);
   return {
-    type: 'widget', padding: 12, gap: 0, backgroundGradient: bg(),
+    type: 'widget', padding: 12, gap: 0, backgroundGradient: bg(), ...(st.focus ? { url: st.focus.url } : {}),
     children: [
       row([icon('checkmark.rectangle.stack.fill', C.now, 11), T(dateTitle(now), 10, C.dim, 'medium'), spacer(),
         T(today.work ? '工作日' : '休息', 9, today.work ? C.faint : C.rest)]),
