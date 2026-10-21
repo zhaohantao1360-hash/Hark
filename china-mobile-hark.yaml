@@ -14,7 +14,7 @@ scriptings:
   # 小组件脚本（generic）
   - generic:
       name: "china-mobile-hark"
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark.js"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark.js?v=20261022-0720"
       timeout: 20
       env:
         CM_PHONENUMBER: ""           # 必填：11 位移动手机号
@@ -27,16 +27,22 @@ scriptings:
   - http_request:
       name: "中国移动登录捕获-Hark"
       match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark.js"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark.js?v=20261022-0720"
       body_required: true
       timeout: 10
+      env:
+        CM_CAPTURE: "true"           # 抓取开关：false = 不再抓取（已登录好后可关，过期需再打开）
+        CM_CAPTURE_NOTIFY: "false"   # true = 每次抓到都通知；默认只在首次/过期恢复时通知
 
   # Cookie 刷新：从登录响应抓 Set-Cookie，保持会话有效
   - http_response:
       name: "中国移动Cookie捕获-Hark"
       match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark.js"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark.js?v=20261022-0720"
       timeout: 10
+      env:
+        CM_CAPTURE: "true"           # 抓取开关：false = 不再抓取（已登录好后可关，过期需再打开）
+        CM_CAPTURE_NOTIFY: "false"   # true = 每次抓到都通知；默认只在首次/过期恢复时通知
 
 widgets:
   - name: "china-mobile-hark"
