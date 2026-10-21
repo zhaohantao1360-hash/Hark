@@ -441,7 +441,11 @@ async function handleCapture(ctx) {
   }
   dlog(ctx, `解密OK（x-qen=${usedQen}），顶层字段: ${Object.keys(JSON.parse(plain)).join(',').slice(0, 120)}`);
 
-  const changed = ctx.storage.get(STORE.paramsEnc) !== body;
+  const prevEnc = ctx.storage.get(STORE.paramsEnc);
+  const changed = prevEnc !== body;
+  // 只在首次抓到、或登录过期后恢复时提醒；平时静默更新（CM_CAPTURE_NOTIFY=true 可恢复每次提醒）
+  const wasExpired = (ctx.storage.get('cm_expire_notify') || '0') !== '0';
+  const shouldNotify = !prevEnc || wasExpired || ((ctx.env || {}).CM_CAPTURE_NOTIFY === 'true');
   ctx.storage.set(STORE.paramsEnc, body);
   ctx.storage.set(STORE.xqen, usedQen);
   ctx.storage.set(STORE.loginUrl, url);
@@ -460,7 +464,10 @@ async function handleCapture(ctx) {
 
   if (changed) {
     ctx.storage.set(STORE.loginTs, String(Date.now()));
-    ctx.notify({ title: '中国移动', body: '登录参数捕获成功，小组件将自动更新' });
+    if (shouldNotify) {
+      ctx.notify({ title: '中国移动', body: wasExpired ? '登录已恢复，小组件将自动更新' : '登录参数捕获成功，小组件将自动更新' });
+      if (wasExpired) ctx.storage.set('cm_expire_notify', '0');
+    }
     // 自检：用刚抓到的参数试一次话费查询，结果打日志（只在新捕获时跑一次）
     try {
       const params = JSON.parse(plain);
@@ -1310,6 +1317,8 @@ async function handleWidget(ctx) {
 export default async function (ctx) {
   // ctx.request 存在 → request/response 捕获；否则 → 小组件
   if (ctx.request && ctx.request.url) {
+    // 抓取开关：CM_CAPTURE=false 时完全不抓（打开中国移动 App 不再有任何动作）
+    if ((ctx.env || {}).CM_CAPTURE === 'false') return;
     // response 脚本同时带 request 与 response；优先按 response 处理
     if (ctx.response && (ctx.response.status || ctx.response.headers)) {
       return handleRespCapture(ctx);
