@@ -22,7 +22,7 @@
 
 const BASE = 'https://wx.10086.cn';
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148/wkwebview leadeon/12.5.2/CMCCIT';
-const KEY = { cred: 'cmcc_sign_cred', last: 'cmcc_sign_last', live: 'cmcc_sign_live', seen: 'cmcc_sign_seen' };
+const KEY = { cred: 'cmcc_sign_cred', last: 'cmcc_sign_last', live: 'cmcc_sign_live', seen: 'cmcc_sign_seen', app: 'cmcc_sign_app' };
 const NAME = '中国移动签到';
 
 const clean = (v) => String(v == null ? '' : v).trim();
@@ -72,6 +72,65 @@ async function readBody(obj, globalName) {
     try { text = await obj.text(); consumed = true; } catch (_) {}
   }
   return { text, consumed };
+}
+
+/* ==================== 复用中国移动 App 原生登录（与移动小组件同一原理） ==================== */
+// App 原生接口（client.app.coc.10086.cn / 10086.online-cmcc.cn）请求里带着 JSESSIONID/UID 等会话 Cookie，
+// 这串 Cookie 就是签到活动 appTokenLogin 需要的 App 票据。小组件每 20 分钟保活，票据一直新鲜。
+const COOKIE_ATTR = /^(path|domain|expires|max-age|httponly|secure|samesite|version|comment)$/i;
+function normCookie(raw) {
+  const out = {};
+  for (const part of String(raw || '').split(/;\s*|,\s*(?=[A-Za-z0-9_\-]+=)/)) {
+    const i = part.indexOf('=');
+    if (i <= 0) continue;
+    const k = part.slice(0, i).trim();
+    if (!k || COOKIE_ATTR.test(k)) continue;
+    out[k] = part.slice(i + 1).trim();
+  }
+  return out;
+}
+function mergeAppCookie(ctx, raw) {
+  const add = normCookie(raw);
+  if (!add.JSESSIONID && !add.UID) return false;
+  let cur = {};
+  try { cur = ctx.storage.getJSON(KEY.app) || {}; } catch (_) {}
+  const before = JSON.stringify(cur.kv || {});
+  const kv = { ...(cur.kv || {}), ...add };
+  ctx.storage.setJSON(KEY.app, { kv, ts: Date.now() });
+  return before !== JSON.stringify(kv);
+}
+function appToken(ctx) {
+  let kv = {};
+  try { kv = (ctx.storage.getJSON(KEY.app) || {}).kv || {}; } catch (_) {}
+  // 兜底：移动小组件存的 cm_cookie（若两个模块共用存储即可直接用）
+  if (!kv.JSESSIONID) {
+    try { const w = ctx.storage.get('cm_cookie'); if (w) kv = { ...normCookie(w), ...kv }; } catch (_) {}
+  }
+  if (!kv.JSESSIONID) return '';
+  return Object.entries(kv).map(([k, v]) => `${k}=${v}`).join('; ');
+}
+function phoneOf(ctx) {
+  const e = clean((ctx.env || {}).CMCC_PHONE);
+  if (/^1\d{10}$/.test(e)) return e;
+  for (const k of ['cmcc_sign_phone', 'cm_phone_backup']) {
+    try { const v = clean(ctx.storage.get(k)); if (/^1\d{10}$/.test(v)) return v; } catch (_) {}
+  }
+  return '';
+}
+function captureApp(ctx) {
+  let ck = '';
+  try {
+    ck = ctx.response ? (ctx.response.headers.getAll('set-cookie') || []).join(', ') : (ctx.request.headers.get('cookie') || '');
+  } catch (_) {}
+  if (ck && mergeAppCookie(ctx, ck)) {
+    console.log('[CMCC] App 会话已更新');
+    let n = {};
+    try { n = ctx.storage.getJSON('cmcc_sign_appnote') || {}; } catch (_) {}
+    if (!n.done) {
+      ctx.storage.setJSON('cmcc_sign_appnote', { done: Date.now() });
+      try { ctx.notify({ title: NAME, subtitle: '已获取 App 登录信息', body: '每天会自动签到领流量，现在可以在 Egern 里手动跑一次「移动每日签到-Hark」试试' }); } catch (_) {}
+    }
+  }
 }
 
 /* ==================== 凭证抓取（App 打开签到页时） ==================== */
@@ -249,10 +308,12 @@ async function openSession(ctx, o, cred) {
   if (!m) throw new Error('登录页未返回 sid，活动入口可能已变更');
   const loginUrl = `${BASE}/qwhdsso${m[1]}`;
 
+  const e = ctx.env || {};
+  const phone = phoneOf(ctx);
   const base = {
-    provinceCode: cred.provinceCode,
-    cityCode: cred.cityCode,
-    userCheckId: cred.userCheckId,
+    provinceCode: cred.provinceCode || clean(e.CMCC_PROVINCE) || '100',
+    cityCode: cred.cityCode || clean(e.CMCC_CITY) || '010',
+    userCheckId: cred.userCheckId || (phone ? Number(phone).toString(16) : ''),
     carrierOperator: cred.carrierOperator || '002',
     appVersionCode: cred.appVersionCode || '12.5.2',
     took: rand(120, 900),
@@ -265,8 +326,9 @@ async function openSession(ctx, o, cred) {
     if (r.code === 'SUCCESS' && r.data) data = r.data;
     else console.log(`[CMCC] jwt 续期失败：${r.code} ${r.msg || ''}`);
   }
-  if (!data && cred.token) {
-    const r = await json(await req(ctx, jar, 'POST', loginUrl, { body: { ...base, jwtToken: null, token: cred.token }, headers: jsonHdr }));
+  for (const tk of [cred.token, appToken(ctx)].filter((v, i, a) => v && a.indexOf(v) === i)) {
+    if (data) break;
+    const r = await json(await req(ctx, jar, 'POST', loginUrl, { body: { ...base, jwtToken: null, token: tk }, headers: jsonHdr }));
     if (r.code === 'SUCCESS' && r.data) data = r.data;
     else console.log(`[CMCC] App 票据登录失败：${r.code} ${r.msg || ''}`);
   }
@@ -305,8 +367,13 @@ function prizeText(p) {
 async function signOnce(ctx, o) {
   const cred = getCred(ctx);
   const live = liveSession(ctx);
-  if (!live && (!cred.userCheckId || (!cred.jwt && !cred.token))) {
-    return { ok: false, need: true, msg: '还没有签到凭证：打开中国移动 App →「我的」→「签到领流量」进一次签到页' };
+  const hasId = cred.userCheckId || phoneOf(ctx);
+  const hasTk = cred.jwt || cred.token || appToken(ctx);
+  if (!live && !hasId) {
+    return { ok: false, need: true, msg: '缺手机号：在 Egern 本模块设置里填「手机号」' };
+  }
+  if (!live && !hasTk) {
+    return { ok: false, need: true, msg: '还没拿到登录信息：打开「中国移动」App 停留几秒即可' };
   }
   let s = live;
   if (!s) try {
@@ -315,7 +382,7 @@ async function signOnce(ctx, o) {
     if (e instanceof AuthError) {
       cred.expired = true;
       setCred(ctx, cred);
-      return { ok: false, need: true, msg: '登录凭证已过期：打开中国移动 App 进一次「签到领流量」页即可恢复' };
+      return { ok: false, need: true, msg: '登录信息已过期：打开「中国移动」App 停留几秒即可恢复' };
     }
     throw e;
   }
@@ -327,7 +394,7 @@ async function signOnce(ctx, o) {
   } catch (e) {
     if (!live) throw e;
     ctx.storage.delete(KEY.live);
-    if (!cred.userCheckId || (!cred.jwt && !cred.token)) return { ok: false, need: true, msg: '临时会话已失效：再进一次「签到领流量」页' };
+    if (!hasId || !hasTk) return { ok: false, need: true, msg: '临时会话已失效：打开「中国移动」App 停留几秒即可' };
     s = await openSession(ctx, o, cred);
     st = await markStatus(ctx, s);
   }
@@ -466,6 +533,7 @@ export default async function (ctx) {
   const o = opts(ctx);
   if (ctx.request && ctx.request.url) {
     if (!o.capture) return;
+    if (/^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)/.test(ctx.request.url)) { captureApp(ctx); return; }
     const isLogin = /\/qwhdsso\/appTokenLogin/.test(ctx.request.url);
     if (ctx.response) {
       await captureAnyResponse(ctx);
