@@ -42,35 +42,35 @@ scriptings:
   - http_request:
       name: 移动签到凭证-请求
       match: '^https:\/\/wx\.10086\.cn\/'
-      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261022-0815
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261022-0820
       body_required: true
       timeout: 30
   - http_response:
       name: 移动签到凭证-响应
       match: '^https:\/\/wx\.10086\.cn\/'
-      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261022-0815
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261022-0820
       body_required: true
       timeout: 30
   - http_request:
       name: 移动App登录信息-请求
       match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
-      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261022-0815
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261022-0820
       timeout: 10
   - http_response:
       name: 移动App登录信息-响应
       match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
-      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261022-0815
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261022-0820
       timeout: 10
   - schedule:
       name: 移动每日签到-Hark
       cron: '18 9,13,20 * * *'
-      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261022-0815
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261022-0820
       timeout: 90
       env:
         MODE: sign
   - generic:
       name: 移动签到-Hark
-      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261022-0815
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261022-0820
       timeout: 60
 
 widgets:

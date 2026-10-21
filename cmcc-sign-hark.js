@@ -106,7 +106,8 @@ function appToken(ctx) {
   if (!kv.JSESSIONID) {
     try { const w = ctx.storage.get('cm_cookie'); if (w) kv = { ...normCookie(w), ...kv }; } catch (_) {}
   }
-  if (!kv.JSESSIONID) return '';
+  // 只有 NingBo 集群的票据能换签到会话；client.app.coc 的 coc3 票据（SessionServer-unity）不行
+  if (!kv.JSESSIONID || !/NingBo/i.test(kv.ticketID || '')) return '';
   return Object.entries(kv).map(([k, v]) => `${k}=${v}`).join('; ');
 }
 function phoneOf(ctx) {
