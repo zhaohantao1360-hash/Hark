@@ -2,6 +2,23 @@ name: "中国移动（Hark 原版风格）"
 description: "桌面/锁屏小组件：剩余话费、通用流量、其他流量、语音（带进度条）。先在「中国移动」App 用短信验证码登录一次自动捕获参数"
 author: "Hark（基于 zhaohantao1360-hash v20 改版，保留原版界面风格）"
 
+
+# Egern 模块设置页自动生成的开关/输入框（模块级 env，优先级最高）
+env_schema:
+  CM_CAPTURE:
+    name: "抓取登录信息"
+    description: "打开「中国移动」App 时自动更新登录信息。关掉后不再抓取，登录过期也不会自动恢复"
+    default_value: "true"
+    options: ["true", "false"]
+  CM_CAPTURE_NOTIFY:
+    name: "每次抓取都通知"
+    description: "默认关：只在第一次抓到或登录过期恢复时通知"
+    default_value: "false"
+    options: ["true", "false"]
+  CM_PHONENUMBER:
+    name: "手机号（选填）"
+    description: "11 位移动手机号；不填则用已保存的号码"
+
 # 需要解密中国移动 App 的 HTTPS 流量：Egern 设置里安装并信任 CA，
 # 再到 iOS「设置→通用→关于本机→证书信任设置」里打开信任
 mitm:
@@ -14,7 +31,7 @@ scriptings:
   # 小组件脚本（generic）
   - generic:
       name: "china-mobile-hark-classic"
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-classic.js?v=20261022-0720"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-classic.js?v=20261022-0725"
       timeout: 20
       env:
         CM_PHONENUMBER: ""           # 必填：11 位移动手机号
@@ -26,7 +43,7 @@ scriptings:
   - http_request:
       name: "中国移动登录捕获-Hark原版风格"
       match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-classic.js?v=20261022-0720"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-classic.js?v=20261022-0725"
       body_required: true
       timeout: 10
       env:
@@ -37,7 +54,7 @@ scriptings:
   - http_response:
       name: "中国移动Cookie捕获-Hark原版风格"
       match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-classic.js?v=20261022-0720"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-classic.js?v=20261022-0725"
       timeout: 10
       env:
         CM_CAPTURE: "true"           # 抓取开关：false = 不再抓取（已登录好后可关，过期需再打开）
