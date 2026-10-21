@@ -22,7 +22,7 @@
 
 const BASE = 'https://wx.10086.cn';
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148/wkwebview leadeon/12.5.2/CMCCIT';
-const KEY = { cred: 'cmcc_sign_cred', last: 'cmcc_sign_last' };
+const KEY = { cred: 'cmcc_sign_cred', last: 'cmcc_sign_last', live: 'cmcc_sign_live', seen: 'cmcc_sign_seen' };
 const NAME = '中国移动签到';
 
 const clean = (v) => String(v == null ? '' : v).trim();
@@ -119,6 +119,74 @@ async function captureResponse(ctx) {
   return consumed ? { body: text } : undefined;
 }
 
+// 签到页自己发出的活动请求里带着 *_SESSION_TOKEN（约 30 分钟有效）：存下来，立刻能直接签到
+function saveLive(ctx, cookie, referer) {
+  const m = String(cookie || '').match(/(?:^|;\s*)([A-Z]+_SESSION_TOKEN)=([^;]+)/);
+  if (!m) return false;
+  const prev = liveRaw(ctx);
+  ctx.storage.setJSON(KEY.live, { cookie: String(cookie), referer: referer || (prev && prev.referer) || '', ts: Date.now() });
+  return !prev || !String(prev.cookie).includes(m[2]);
+}
+function liveRaw(ctx) { try { return ctx.storage.getJSON(KEY.live); } catch (_) { return null; } }
+function liveSession(ctx) {
+  const l = liveRaw(ctx);
+  if (!l || !l.cookie || Date.now() - (l.ts || 0) > 25 * 60000) return null;
+  const jar = cookieJar();
+  for (const kv of String(l.cookie).split(/;\s*/)) {
+    const i = kv.indexOf('=');
+    if (i > 0) jar.put(kv.slice(0, i).trim(), kv.slice(i + 1).trim());
+  }
+  return { jar, referer: l.referer || `${BASE}/qwhdhub/qwhdmark/1021122301?channelId=P00000109876`, live: true };
+}
+
+function markSeen(ctx, url) {
+  // 第一次看到 wx.10086.cn 的活动请求时通知一次，证明 MITM 生效
+  let seen = {};
+  try { seen = ctx.storage.getJSON(KEY.seen) || {}; } catch (_) {}
+  const path = String(url).replace(/^https:\/\/wx\.10086\.cn/, '').split('?')[0].split('/').slice(0, 3).join('/');
+  console.log(`[CMCC] 看到请求 ${path}`);
+  if (!seen.any) {
+    seen.any = Date.now();
+    try { ctx.notify({ title: NAME, subtitle: '已拦截到签到页请求', body: `MITM 正常（${path}），正在抓取凭证…` }); } catch (_) {}
+  }
+  seen[path] = (seen[path] || 0) + 1;
+  ctx.storage.setJSON(KEY.seen, seen);
+}
+
+async function captureAny(ctx) {
+  const url = ctx.request.url;
+  markSeen(ctx, url);
+  let cookie = '';
+  try { cookie = ctx.request.headers.get('cookie') || ''; } catch (_) {}
+  let referer = '';
+  try { referer = ctx.request.headers.get('referer') || ''; } catch (_) {}
+  if (/\/qwhdhub\/qwhdmark\//.test(url)) referer = url;
+  if (!/^https:\/\/wx\.10086\.cn\/qwhdhub\//.test(referer)) referer = '';
+  if (cookie && saveLive(ctx, cookie, referer)) {
+    console.log('[CMCC] 抓到活动会话');
+    const last = getLast(ctx);
+    if (!(last.date === ymd() && last.ok)) {
+      try {
+        const rec = await runSign(ctx, { force: true });
+        if (rec.ok && !getCred(ctx).jwt) {
+          try { ctx.notify({ title: NAME, subtitle: '提示', body: '今天已签上；长期凭证还没抓到，之后若提示过期，再进一次签到页就行' }); } catch (_) {}
+        }
+      } catch (e) { console.log(`[CMCC] 即时签到出错 ${e.message}`); }
+    }
+  }
+}
+
+async function captureAnyResponse(ctx) {
+  let list = [];
+  try { list = ctx.response.headers.getAll('set-cookie') || []; } catch (_) {}
+  const kv = list.map((x) => String(x).split(';')[0]).filter((x) => /_SESSION_TOKEN=/.test(x));
+  if (kv.length) {
+    const ref = /\/qwhdhub\/qwhdmark\//.test(ctx.request.url) ? ctx.request.url : '';
+    saveLive(ctx, kv.join('; '), ref);
+    console.log('[CMCC] 响应里抓到活动会话');
+  }
+}
+
 /* ==================== 会话 ==================== */
 
 function cookieJar() {
@@ -139,6 +207,7 @@ function cookieJar() {
         if (i > 0) jar[kv.slice(0, i).trim()] = kv.slice(i + 1).trim();
       }
     },
+    put(k, v) { jar[k] = v; },
     header() { return Object.entries(jar).map(([k, v]) => `${k}=${v}`).join('; '); },
     has(re) { return Object.keys(jar).some((k) => re.test(k)); },
   };
@@ -235,11 +304,12 @@ function prizeText(p) {
 
 async function signOnce(ctx, o) {
   const cred = getCred(ctx);
-  if (!cred.userCheckId || (!cred.jwt && !cred.token)) {
+  const live = liveSession(ctx);
+  if (!live && (!cred.userCheckId || (!cred.jwt && !cred.token))) {
     return { ok: false, need: true, msg: '还没有签到凭证：打开中国移动 App →「我的」→「签到领流量」进一次签到页' };
   }
-  let s;
-  try {
+  let s = live;
+  if (!s) try {
     s = await openSession(ctx, o, cred);
   } catch (e) {
     if (e instanceof AuthError) {
@@ -251,7 +321,16 @@ async function signOnce(ctx, o) {
   }
 
   const today = ymd();
-  let st = await markStatus(ctx, s);
+  let st;
+  try {
+    st = await markStatus(ctx, s);
+  } catch (e) {
+    if (!live) throw e;
+    ctx.storage.delete(KEY.live);
+    if (!cred.userCheckId || (!cred.jwt && !cred.token)) return { ok: false, need: true, msg: '临时会话已失效：再进一次「签到领流量」页' };
+    s = await openSession(ctx, o, cred);
+    st = await markStatus(ctx, s);
+  }
   let acc = (st.userinfo || {}).accumulateTimes;
   const signed = (st.markstatus || []).some((d) => d.date === today && String(d.status) === '1');
   const lines = [];
@@ -387,9 +466,14 @@ export default async function (ctx) {
   const o = opts(ctx);
   if (ctx.request && ctx.request.url) {
     if (!o.capture) return;
-    if (!/\/qwhdsso\/appTokenLogin/.test(ctx.request.url)) return;
-    if (ctx.response) return captureResponse(ctx);
-    return captureRequest(ctx);
+    const isLogin = /\/qwhdsso\/appTokenLogin/.test(ctx.request.url);
+    if (ctx.response) {
+      await captureAnyResponse(ctx);
+      return isLogin ? captureResponse(ctx) : undefined;
+    }
+    if (isLogin) { markSeen(ctx, ctx.request.url); return captureRequest(ctx); }
+    await captureAny(ctx);
+    return;
   }
   if (o.mode === 'sign' || ctx.cron) {
     await sleep(rand(0, 20000)); // 错峰，避免整点集中请求
