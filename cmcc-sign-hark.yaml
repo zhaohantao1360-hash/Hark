@@ -1,0 +1,55 @@
+name: 中国移动签到领流量（Hark）
+description: 每天自动在「中国移动」App 的「签到领流量」签到，并代领累计/连签奖励（流量券、话费券）。首次使用：打开中国移动 App →「我的」→「签到领流量」进一次签到页，收到「签到凭证已保存」通知即可。凭证过期时会通知你再进一次。
+author: Hark（接口参考 yupaiLy/cmcc-auto-checkin）
+icon: antenna.radiowaves.left.and.right
+
+env_schema:
+  CMCC_CLAIM:
+    name: 自动领奖励
+    description: 签到后顺手领取累计/连签奖励（热门奖品库存有限，领不到属正常）
+    default_value: 'true'
+    options: ['true', 'false']
+  CMCC_NOTIFY:
+    name: 通知
+    description: all=签到和领奖都通知；fail=只在失败或需要你操作时通知；off=不通知
+    default_value: all
+    options: [all, fail, 'off']
+  CMCC_CAPTURE:
+    name: 抓取签到凭证
+    description: 打开签到页时自动更新凭证。关掉后凭证过期不会自动恢复
+    default_value: 'true'
+    options: ['true', 'false']
+
+mitm:
+  hostnames:
+    includes:
+      - wx.10086.cn
+
+scriptings:
+  - http_request:
+      name: 移动签到凭证-请求
+      match: '^https:\/\/wx\.10086\.cn\/qwhdsso\/appTokenLogin'
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261022-0800
+      body_required: true
+      timeout: 10
+  - http_response:
+      name: 移动签到凭证-响应
+      match: '^https:\/\/wx\.10086\.cn\/qwhdsso\/appTokenLogin'
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261022-0800
+      body_required: true
+      timeout: 10
+  - schedule:
+      name: 移动每日签到-Hark
+      cron: '18 9,13,20 * * *'
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261022-0800
+      timeout: 90
+      env:
+        MODE: sign
+  - generic:
+      name: 移动签到-Hark
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261022-0800
+      timeout: 60
+
+widgets:
+  - name: 移动签到-Hark
+    script_name: 移动签到-Hark
