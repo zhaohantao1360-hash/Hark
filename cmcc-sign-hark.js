@@ -1087,13 +1087,8 @@ function infoRow(icon, label, value, vColor) {
 
 function updated(rec, size) {
   if (!rec.ts) return { type: 'spacer', length: 1 };
-  return {
-    type: 'stack', direction: 'row', gap: 3,
-    children: [
-      { type: 'text', text: '更新于', font: { size }, textColor: C.dim },
-      { type: 'date', date: new Date(rec.ts).toISOString(), format: 'relative', font: { size }, textColor: C.dim },
-    ],
-  };
+  const d = new Date(rec.ts);
+  return { type: 'text', text: `更新 ${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`, font: { size }, textColor: C.dim, maxLines: 1 };
 }
 
 function widget(ctx, rec) {
