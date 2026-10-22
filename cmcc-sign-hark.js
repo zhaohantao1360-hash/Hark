@@ -860,10 +860,37 @@ async function signBj(ctx) {
       }
       months = list.map((x) => ({ month: String(x.month || ''), signStatus: String(x.signStatus ?? ''), prizeStatus: String(x.prizeStatus ?? '') }));
     } catch (e) { await diag(ctx, `MONTH 出错 ${e && e.message}`); }
+    // 秘境寻宝（ActNationalDay2026）：有抽奖机会就抽，2026-10-22 抓包：GET customPrize?type=draw
     try {
+      const a = await bjCall(ctx, 'GET', `/ActNationalDay2026/getActivityMain/QD/ActNationalDay2026?${q}&transactionid=${Date.now()}`);
+      let left = Number((a.j && a.j.drawChance && a.j.drawChance.remainCount) || 0);
+      await diag(ctx, `MIJING main → ${a.status} remain=${left} ${a.text.slice(0, 200)}`);
+      for (let i = 0; i < Math.min(left, 3); i++) {
+        await sleep(rand(800, 1500));
+        const r = await bjCall(ctx, 'GET', `/ActNationalDay2026/customPrize/QD/ActNationalDay2026?type=draw&${q}&transactionid=${Date.now()}`);
+        await diag(ctx, `MIJING draw → ${r.status} ${r.text.slice(0, 400)}`);
+        const pl = (r.j && Number(r.j.result) === 0 && r.j.prizelist) || [];
+        if (pl[0] && pl[0].prizeName) extra.push(`秘境寻宝：${pl[0].prizeName}`);
+      }
+    } catch (e) { await diag(ctx, `MIJING 出错 ${e && e.message}`); }
+    // 养小树：浏览类任务（taskType=4）页面自己就是调 skipTaskToFinishSt 完成，然后领奖励果
+    try {
+      const ts = Date.now();
+      const t = await bjCall(ctx, 'GET', `/task-system/queryMyTaskListSt?userarea=1&channelid=&timestamp=${ts}&transactionid=${ts}&os=ios&channel=JT&${q}`);
+      const tasks = ((t.j && t.j.task_info) || []).filter((x) => x && Number(x.taskType) === 4);
+      await diag(ctx, `TREE tasks → ${t.status} n=${tasks.length} ${tasks.map((x) => `${x.id}:${x.status}:${x.taskBeginTime || ''}-${x.taskEndTime || ''}`).join(',').slice(0, 600)}`);
+      let okN = 0;
+      for (const x of tasks.slice(0, 15)) {
+        await sleep(rand(600, 1200));
+        const r = await bjCall(ctx, 'GET', `/task-system/skipTaskToFinishSt?task_id=${x.id}&channel=JT&transactionid=${Date.now()}&${q}`);
+        await diag(ctx, `TREE skip ${x.id}(${x.status}) → ${r.status} ${r.text.slice(0, 150)}`);
+        if (r.j && String(r.j.result) === '0') okN++;
+      }
+      await sleep(rand(800, 1500));
       const f = await bjCall(ctx, 'GET', `/task-system/getTaskFruitSt?timestamp=${Date.now()}&transactionid=${Date.now()}&channel=JT&${q}`);
       await diag(ctx, `FRUIT → ${f.status} ${f.text.slice(0, 300)}`);
-    } catch (_) {}
+      if (okN) extra.push(`养小树任务 ${okN} 个`);
+    } catch (e) { await diag(ctx, `TREE 出错 ${e && e.message}`); }
   }
   const days = (j.signInList || []).map((x) => ({ d: x.signInDate, p: x.signInPrize || '' }));
   return { ok: true, lines: ['签到成功'], prizes: [...(it && it.signInPrize ? [it.signInPrize] : []), ...extra], days, cards: Number(j.signCardNum || 0), months };
