@@ -841,7 +841,19 @@ async function signBj(ctx) {
   const today = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const it = (j.signInList || []).find((x) => x.signInDate === today);
   if (!j.isSignIn && !it) throw new Error('签到没生效（接口返回未签）');
-  return { ok: true, lines: ['签到成功'], prizes: it && it.signInPrize ? [it.signInPrize] : [] };
+  // 附加信息（失败不影响签到结果）：月度连签状态
+  let months = [];
+  try {
+    const tok = (ctx.storage.getJSON(KEY_BJS) || {}).tok;
+    if (tok) {
+      const m = await bjCall(ctx, 'GET', `/ActSignIn2023/ContinuousSignIn/getActivityMain/JT/ContinuousSignIn2026?token=${encodeURIComponent(tok)}&transactionid=${Date.now()}`);
+      await diag(ctx, `MONTH → ${m.status} ${m.text.slice(0, 600)}`);
+      const list = (m.j && (m.j.list || (m.j.data && m.j.data.list))) || [];
+      months = list.map((x) => ({ month: String(x.month || ''), signStatus: String(x.signStatus ?? ''), prizeStatus: String(x.prizeStatus ?? ''), prize: String(x.signPrize || '') }));
+    }
+  } catch (_) {}
+  const days = (j.signInList || []).map((x) => ({ d: x.signInDate, p: x.signInPrize || '' }));
+  return { ok: true, lines: ['签到成功'], prizes: it && it.signInPrize ? [it.signInPrize] : [], days, cards: Number(j.signCardNum || 0), months };
 }
 
 async function signOnce(ctx, o) {
@@ -958,54 +970,186 @@ const C = {
   ok: '#30D158',
   warn: '#FF9F0A',
   bad: '#FF453A',
+  faint: { light: '#C7C7CC', dark: '#48484A' },
 };
+
+const dkey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const WK = ['日', '一', '二', '三', '四', '五', '六'];
+const CRON_H = [9, 13, 20];
+
+function signInfo(rec) {
+  const now = new Date();
+  const done = rec.date === ymd() && rec.ok;
+  const set = new Set((rec.days || []).filter((x) => x && x.d).map((x) => x.d));
+  if (done) set.add(dkey(now));
+  // 连续签到：从今天（今天没签则从昨天）往回数
+  let streak = 0;
+  const c = new Date(now);
+  if (!set.has(dkey(c))) c.setDate(c.getDate() - 1);
+  while (set.has(dkey(c)) && streak < 400) { streak++; c.setDate(c.getDate() - 1); }
+  // 最近 7 天
+  const week = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now); d.setDate(d.getDate() - i);
+    week.push({ label: i === 0 ? '今' : WK[d.getDay()], signed: set.has(dkey(d)), today: i === 0 });
+  }
+  // 下次自动签到
+  let next = '';
+  if (done) next = `明天 ${pad(CRON_H[0])}:18`;
+  else {
+    const h = CRON_H.find((x) => now.getHours() < x || (now.getHours() === x && now.getMinutes() < 18));
+    next = h != null ? `今天 ${pad(h)}:18` : `明天 ${pad(CRON_H[0])}:18`;
+  }
+  return { done, streak, week, next };
+}
+
+function weekStrip(info, size) {
+  return {
+    type: 'stack', direction: 'row', gap: 0,
+    children: info.week.flatMap((w, i) => {
+      const icon = w.signed ? 'checkmark.circle.fill' : w.today ? 'circle.dashed' : 'circle';
+      const col = w.signed ? C.ok : w.today ? C.warn : C.faint;
+      const cell = {
+        type: 'stack', direction: 'column', gap: 3, alignItems: 'center',
+        children: [
+          { type: 'image', src: `sf-symbol:${icon}`, color: col, width: size, height: size },
+          { type: 'text', text: w.label, font: { size: 9, weight: w.today ? 'bold' : 'regular' }, textColor: w.today ? C.text : C.dim },
+        ],
+      };
+      return i === 0 ? [cell] : [{ type: 'spacer' }, cell];
+    }),
+  };
+}
+
+function header(done) {
+  return {
+    type: 'stack', direction: 'row', gap: 5, alignItems: 'center',
+    children: [
+      { type: 'image', src: 'sf-symbol:antenna.radiowaves.left.and.right', color: C.brand, width: 14, height: 14 },
+      { type: 'text', text: '移动签到', font: { size: 13, weight: 'semibold' }, textColor: C.text },
+      { type: 'spacer' },
+      { type: 'image', src: done ? 'sf-symbol:checkmark.seal.fill' : 'sf-symbol:clock.fill', color: done ? C.ok : C.warn, width: 15, height: 15 },
+    ],
+  };
+}
+
+function infoRow(icon, label, value, vColor) {
+  return {
+    type: 'stack', direction: 'row', gap: 5, alignItems: 'center',
+    children: [
+      { type: 'image', src: `sf-symbol:${icon}`, color: C.dim, width: 11, height: 11 },
+      { type: 'text', text: label, font: { size: 11 }, textColor: C.dim },
+      { type: 'spacer' },
+      { type: 'text', text: value, font: { size: 11, weight: 'semibold' }, textColor: vColor || C.text, maxLines: 1 },
+    ],
+  };
+}
+
+function updated(rec, size) {
+  if (!rec.ts) return { type: 'spacer', length: 1 };
+  return {
+    type: 'stack', direction: 'row', gap: 3,
+    children: [
+      { type: 'text', text: '更新于', font: { size }, textColor: C.dim },
+      { type: 'date', date: new Date(rec.ts).toISOString(), format: 'relative', font: { size }, textColor: C.dim },
+    ],
+  };
+}
 
 function widget(ctx, rec) {
   const family = ctx.widgetFamily || 'systemSmall';
-  const today = ymd();
-  const done = rec.date === today && rec.ok;
-  const state = done ? '今日已签' : rec.need ? '需打开签到页' : rec.msg ? '签到失败' : '待签到';
+  const info = signInfo(rec);
+  const done = info.done;
+  const state = done ? '今日已签' : rec.need ? '需要处理' : rec.msg ? '签到失败' : '等待签到';
   const color = done ? C.ok : rec.need ? C.warn : rec.msg ? C.bad : C.dim;
   const prize = (rec.prizes || []).filter(Boolean)[0] || '';
+  const sub = done ? (prize ? `🎁 ${prize}` : '签到完成') : (rec.msg || `下次 ${info.next}`);
+  const bg = { light: '#FFFFFF', dark: '#1C1C1E' };
 
   if (family === 'accessoryInline') {
-    return { type: 'widget', children: [{ type: 'text', text: `移动签到 · ${state}${rec.acc ? ` · ${rec.acc}天` : ''}` }] };
+    return { type: 'widget', children: [{ type: 'text', text: `移动签到 · ${state}${info.streak ? ` · 连签${info.streak}天` : ''}` }] };
+  }
+  if (family === 'accessoryCircular') {
+    return {
+      type: 'widget', alignItems: 'center', gap: 1,
+      children: [
+        { type: 'image', src: done ? 'sf-symbol:checkmark.circle.fill' : 'sf-symbol:clock', width: 18, height: 18 },
+        { type: 'text', text: `${info.streak}天`, font: { size: 12, weight: 'bold' } },
+      ],
+    };
   }
   if (family.startsWith('accessory')) {
     return {
       type: 'widget', gap: 2,
       children: [
-        { type: 'text', text: '移动签到', font: { size: 12, weight: 'semibold' } },
-        { type: 'text', text: state, font: { size: 14, weight: 'bold' } },
-        rec.acc ? { type: 'text', text: `累计 ${rec.acc} 天`, font: { size: 11 } } : { type: 'spacer', length: 1 },
+        { type: 'text', text: `移动签到 · ${state}`, font: { size: 13, weight: 'bold' } },
+        { type: 'text', text: done && prize ? prize : sub, font: { size: 12 }, maxLines: 1 },
+        { type: 'text', text: `连签 ${info.streak} 天`, font: { size: 11 } },
       ],
     };
   }
-  const children = [
-    {
-      type: 'stack', direction: 'row', gap: 6, alignItems: 'center',
-      children: [
-        { type: 'image', src: 'sf-symbol:antenna.radiowaves.left.and.right', color: C.brand, width: 16, height: 16 },
-        { type: 'text', text: '签到领流量', font: { size: 14, weight: 'semibold' }, textColor: C.text },
-      ],
-    },
-    { type: 'spacer' },
+
+  const status = [
     { type: 'text', text: state, font: { size: 22, weight: 'bold' }, textColor: color },
-    { type: 'spacer', length: 4 },
-    { type: 'text', text: rec.acc ? `累计签到 ${rec.acc} 天` : (rec.need ? rec.msg : '每天自动签到'), font: { size: 12 }, textColor: C.dim, maxLines: 2 },
+    { type: 'spacer', length: 2 },
+    { type: 'text', text: sub, font: { size: 12, weight: 'medium' }, textColor: done ? C.text : C.dim, maxLines: 2 },
   ];
-  if (prize) children.push({ type: 'text', text: `🎁 ${prize}`, font: { size: 12, weight: 'medium' }, textColor: C.text, maxLines: 1 });
-  if (rec.ts) {
-    children.push({ type: 'spacer', length: 4 });
-    children.push({
-      type: 'stack', direction: 'row', gap: 3,
+
+  if (family === 'systemSmall') {
+    return {
+      type: 'widget', padding: 14, backgroundColor: bg,
       children: [
-        { type: 'text', text: '更新于', font: { size: 10 }, textColor: C.dim },
-        { type: 'date', date: new Date(rec.ts).toISOString(), format: 'relative', font: { size: 10 }, textColor: C.dim },
+        header(done),
+        { type: 'spacer' },
+        ...status,
+        { type: 'spacer' },
+        weekStrip(info, 13),
+        { type: 'spacer', length: 6 },
+        {
+          type: 'stack', direction: 'row',
+          children: [
+            { type: 'text', text: `连签 ${info.streak} 天`, font: { size: 10, weight: 'semibold' }, textColor: C.brand },
+            { type: 'spacer' },
+            updated(rec, 9),
+          ],
+        },
       ],
-    });
+    };
   }
-  return { type: 'widget', padding: 14, children };
+
+  // 中 / 大号：左边状态，右边信息卡
+  const big = family === 'systemLarge' || family === 'systemExtraLarge';
+  const right = {
+    type: 'stack', direction: 'column', gap: big ? 10 : 7, padding: 10, borderRadius: 12,
+    backgroundColor: { light: '#F2F2F7', dark: '#2C2C2E' },
+    children: [
+      weekStrip(info, big ? 18 : 15),
+      infoRow('flame.fill', '连续签到', `${info.streak} 天`, C.brand),
+      infoRow('clock', '下次自动', info.next),
+      ...(rec.cards ? [infoRow('ticket', '签到卡', `${rec.cards} 张`)] : []),
+    ],
+  };
+  return {
+    type: 'widget', padding: 14, backgroundColor: bg,
+    children: [
+      {
+        type: 'stack', direction: 'row', gap: 12, alignItems: 'center',
+        children: [
+          {
+            type: 'stack', direction: 'column', alignItems: 'start', gap: 0, width: big ? 130 : 118, height: 127,
+            children: [
+              header(done),
+              { type: 'spacer' },
+              ...status,
+              { type: 'spacer' },
+              updated(rec, 10),
+            ],
+          },
+          { ...right },
+        ],
+      },
+    ],
+  };
 }
 
 /* ==================== 抓包诊断（wx.10086.cn 非 qwhd 接口，排查北京签到页走的接口） ==================== */
