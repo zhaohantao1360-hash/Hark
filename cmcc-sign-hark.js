@@ -889,28 +889,33 @@ function mask(t) {
 }
 async function traceWx(ctx) {
   const u = ctx.request.url;
-  if (/\/qwhd(sso|hub)\//.test(u) || /\.(js|css|png|jpe?g|gif|svg|webp|woff2?|ttf|ico)(\?|$)/i.test(u)) return undefined;
+  const bj = /^https?:\/\/h5\.bj\.10086\.cn/.test(u);
+  if (/\/qwhd(sso|hub)\//.test(u) || /\.(js|css|png|jpe?g|gif|svg|webp|woff2?|ttf|ico|mp4|mp3)(\?|$)/i.test(u)) return undefined;
+  const nk = bj ? 'cmcc_sign_bjtrace_n' : 'cmcc_sign_trace_n';
   let n = 0;
-  try { n = Number(ctx.storage.get('cmcc_sign_trace_n') || 0); } catch (_) {}
-  if (n >= 60) return undefined;
-  ctx.storage.set('cmcc_sign_trace_n', String(n + 1));
+  try { n = Number(ctx.storage.get(nk) || 0); } catch (_) {}
+  if (n >= (bj ? 120 : 60)) return undefined;
+  ctx.storage.set(nk, String(n + 1));
   const side = ctx.response ? 'response' : 'request';
   const { text, consumed } = await readBody(ctx[side], side);
-  const path = u.replace(/^https:\/\/wx\.10086\.cn/, '');
+  const path = u.replace(/^https?:\/\/wx\.10086\.cn/, '').replace(/^https?:\/\/h5\.bj\.10086\.cn/, 'BJ');
+  const lim = bj ? 900 : 500;
   let line;
   if (side === 'request') {
     let ck = '';
     try { ck = ctx.request.headers.get('cookie') || ''; } catch (_) {}
     const names = ck.split(/;\s*/).map((x) => x.split('=')[0]).filter(Boolean).join(',');
-    line = `→ ${ctx.request.method || ''} ${mask(path).slice(0, 160)} | ck:[${names.slice(0, 160)}] | ${mask(text).slice(0, 500)}`;
+    line = `→ ${ctx.request.method || ''} ${mask(path).slice(0, 160)} | ck:[${names.slice(0, 200)}] | ${mask(text).slice(0, lim)}`;
   } else {
-    line = `← ${ctx.response.status} ${mask(path).slice(0, 100)} | ${mask(text).slice(0, 500)}`;
+    let sc = '';
+    try { sc = (ctx.response.headers.get('set-cookie') || '').split(/,(?=\s*[A-Za-z0-9_\-]+=)/).map((x) => x.split('=')[0].trim()).filter(Boolean).join(','); } catch (_) {}
+    line = `← ${ctx.response.status} ${mask(path).slice(0, 120)}${sc ? ' | set:[' + sc + ']' : ''} | ${mask(text).slice(0, lim)}`;
   }
   console.log('[CMCC诊断] ' + line);
   let arr = [];
   try { arr = ctx.storage.getJSON('cmcc_sign_trace') || []; } catch (_) {}
   arr.push(line);
-  ctx.storage.setJSON('cmcc_sign_trace', arr.slice(-40));
+  ctx.storage.setJSON('cmcc_sign_trace', arr.slice(-60));
   return consumed ? { body: text } : undefined;
 }
 
@@ -920,6 +925,7 @@ export default async function (ctx) {
   const o = opts(ctx);
   if (ctx.request && ctx.request.url) {
     if (!o.capture) return;
+    if (/^https?:\/\/h5\.bj\.10086\.cn/.test(ctx.request.url)) return traceWx(ctx);
     if (/^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)/.test(ctx.request.url)) {
       if (/obtainToken\/getBigNetToken/.test(ctx.request.url)) return captureBig(ctx);
       captureApp(ctx); return;
