@@ -22,7 +22,7 @@
 
 const BASE = 'https://wx.10086.cn';
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148/wkwebview leadeon/12.5.2/CMCCIT';
-const KEY = { cred: 'cmcc_sign_cred', last: 'cmcc_sign_last', live: 'cmcc_sign_live', seen: 'cmcc_sign_seen', app: 'cmcc_sign_app' };
+const KEY = { cred: 'cmcc_sign_cred', last: 'cmcc_sign_last', live: 'cmcc_sign_live', seen: 'cmcc_sign_seen', app: 'cmcc_sign_app', big: 'cmcc_sign_big', bigReq: 'cmcc_sign_bigreq' };
 const NAME = '中国移动签到';
 
 const clean = (v) => String(v == null ? '' : v).trim();
@@ -72,6 +72,359 @@ async function readBody(obj, globalName) {
     try { text = await obj.text(); consumed = true; } catch (_) {}
   }
   return { text, consumed };
+}
+
+/* ==================== 加解密（与 cm_crypto.js 同步，自研并经 node:crypto 验证） ==================== */
+
+/*
+ * cm_crypto.js — 自研 MD5 + AES-128-CBC（供 china-mobile.js 使用）
+ * 与 node:crypto 交叉验证通过（见底部自测）
+ * 注意：仅实现 AES-128（密钥/IV 均为 16 字节 UTF-8），CBC + Pkcs7
+ */
+
+
+
+/* ---------- UTF-8 / hex / base64 ---------- */
+
+function utf8Bytes(str) {
+  const out = [];
+  for (let i = 0; i < str.length; i++) {
+    let c = str.charCodeAt(i);
+    if (c >= 0xd800 && c <= 0xdbff && i + 1 < str.length) {
+      const lo = str.charCodeAt(i + 1);
+      if (lo >= 0xdc00 && lo <= 0xdfff) {
+        c = 0x10000 + ((c - 0xd800) << 10) + (lo - 0xdc00);
+        i++;
+      }
+    }
+    if (c < 0x80) out.push(c);
+    else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+    else if (c < 0x10000) out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+    else out.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 0x3f), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+  }
+  return out;
+}
+
+function utf8String(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length;) {
+    const b = bytes[i];
+    if (b < 0x80) { s += String.fromCharCode(b); i++; }
+    else if ((b & 0xe0) === 0xc0) { s += String.fromCharCode(((b & 0x1f) << 6) | (bytes[i + 1] & 0x3f)); i += 2; }
+    else if ((b & 0xf0) === 0xe0) { s += String.fromCharCode(((b & 0x0f) << 12) | ((bytes[i + 1] & 0x3f) << 6) | (bytes[i + 2] & 0x3f)); i += 3; }
+    else {
+      const c = ((b & 0x07) << 18) | ((bytes[i + 1] & 0x3f) << 12) | ((bytes[i + 2] & 0x3f) << 6) | (bytes[i + 3] & 0x3f);
+      const v = c - 0x10000;
+      s += String.fromCharCode(0xd800 + (v >> 10), 0xdc00 + (v & 0x3ff));
+      i += 4;
+    }
+  }
+  return s;
+}
+
+function bytesToHex(bytes) {
+  return bytes.map((b) => ('0' + (b & 0xff).toString(16)).slice(-2)).join('');
+}
+
+const B64MAP = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+function base64Encode(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b0 = bytes[i], b1 = i + 1 < bytes.length ? bytes[i + 1] : 0, b2 = i + 2 < bytes.length ? bytes[i + 2] : 0;
+    const n = (b0 << 16) | (b1 << 8) | b2;
+    s += B64MAP[(n >> 18) & 63] + B64MAP[(n >> 12) & 63] + (i + 1 < bytes.length ? B64MAP[(n >> 6) & 63] : '=') + (i + 2 < bytes.length ? B64MAP[n & 63] : '=');
+  }
+  return s;
+}
+
+/* ---------- MD5 ---------- */
+
+function md5Hex(str) {
+  const msg = utf8Bytes(str);
+  const bitLen = msg.length * 8;
+  msg.push(0x80);
+  while (msg.length % 64 !== 56) msg.push(0);
+  for (let i = 0; i < 8; i++) msg.push((bitLen / Math.pow(2, i * 8)) & 0xff);
+
+  let a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+  const S = [7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+             5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+             4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+             6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21];
+  const K = [];
+  for (let i = 0; i < 64; i++) K.push(Math.floor(Math.abs(Math.sin(i + 1)) * 4294967296) >>> 0);
+
+  const add = (x, y) => (x + y) >>> 0;
+  const rol = (x, n) => ((x << n) | (x >>> (32 - n))) >>> 0;
+
+  for (let off = 0; off < msg.length; off += 64) {
+    const M = [];
+    for (let i = 0; i < 16; i++) {
+      M.push((msg[off + i * 4] | (msg[off + i * 4 + 1] << 8) | (msg[off + i * 4 + 2] << 16) | (msg[off + i * 4 + 3] << 24)) >>> 0);
+    }
+    let A = a0, B = b0, C = c0, D = d0;
+    for (let i = 0; i < 64; i++) {
+      let F, g;
+      if (i < 16) { F = (B & C) | (~B & D); g = i; }
+      else if (i < 32) { F = (D & B) | (~D & C); g = (5 * i + 1) % 16; }
+      else if (i < 48) { F = B ^ C ^ D; g = (3 * i + 5) % 16; }
+      else { F = C ^ (B | ~D); g = (7 * i) % 16; }
+      F = add(add(add(F, A), K[i]), M[g]);
+      A = D; D = C; C = B;
+      B = add(B, rol(F, S[i]));
+    }
+    a0 = add(a0, A); b0 = add(b0, B); c0 = add(c0, C); d0 = add(d0, D);
+  }
+  const le = (x) => [x & 0xff, (x >> 8) & 0xff, (x >> 16) & 0xff, (x >> 24) & 0xff];
+  return bytesToHex([].concat(le(a0), le(b0), le(c0), le(d0)));
+}
+
+/* ---------- AES-128 ---------- */
+
+const AES_SBOX = [
+  0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,
+  0xca,0x82,0xc9,0x7d,0xfa,0x59,0x47,0xf0,0xad,0xd4,0xa2,0xaf,0x9c,0xa4,0x72,0xc0,
+  0xb7,0xfd,0x93,0x26,0x36,0x3f,0xf7,0xcc,0x34,0xa5,0xe5,0xf1,0x71,0xd8,0x31,0x15,
+  0x04,0xc7,0x23,0xc3,0x18,0x96,0x05,0x9a,0x07,0x12,0x80,0xe2,0xeb,0x27,0xb2,0x75,
+  0x09,0x83,0x2c,0x1a,0x1b,0x6e,0x5a,0xa0,0x52,0x3b,0xd6,0xb3,0x29,0xe3,0x2f,0x84,
+  0x53,0xd1,0x00,0xed,0x20,0xfc,0xb1,0x5b,0x6a,0xcb,0xbe,0x39,0x4a,0x4c,0x58,0xcf,
+  0xd0,0xef,0xaa,0xfb,0x43,0x4d,0x33,0x85,0x45,0xf9,0x02,0x7f,0x50,0x3c,0x9f,0xa8,
+  0x51,0xa3,0x40,0x8f,0x92,0x9d,0x38,0xf5,0xbc,0xb6,0xda,0x21,0x10,0xff,0xf3,0xd2,
+  0xcd,0x0c,0x13,0xec,0x5f,0x97,0x44,0x17,0xc4,0xa7,0x7e,0x3d,0x64,0x5d,0x19,0x73,
+  0x60,0x81,0x4f,0xdc,0x22,0x2a,0x90,0x88,0x46,0xee,0xb8,0x14,0xde,0x5e,0x0b,0xdb,
+  0xe0,0x32,0x3a,0x0a,0x49,0x06,0x24,0x5c,0xc2,0xd3,0xac,0x62,0x91,0x95,0xe4,0x79,
+  0xe7,0xc8,0x37,0x6d,0x8d,0xd5,0x4e,0xa9,0x6c,0x56,0xf4,0xea,0x65,0x7a,0xae,0x08,
+  0xba,0x78,0x25,0x2e,0x1c,0xa6,0xb4,0xc6,0xe8,0xdd,0x74,0x1f,0x4b,0xbd,0x8b,0x8a,
+  0x70,0x3e,0xb5,0x66,0x48,0x03,0xf6,0x0e,0x61,0x35,0x57,0xb9,0x86,0xc1,0x1d,0x9e,
+  0xe1,0xf8,0x98,0x11,0x69,0xd9,0x8e,0x94,0x9b,0x1e,0x87,0xe9,0xce,0x55,0x28,0xdf,
+  0x8c,0xa1,0x89,0x0d,0xbf,0xe6,0x42,0x68,0x41,0x99,0x2d,0x0f,0xb0,0x54,0xbb,0x16];
+const AES_INV_SBOX = new Array(256);
+for (let i = 0; i < 256; i++) AES_INV_SBOX[AES_SBOX[i]] = i;
+const AES_RCON = [0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80,0x1b,0x36];
+
+function aesKeyExpand(keyBytes) {
+  const Nk = 4, Nb = 4, Nr = 10;
+  const W = new Array(4 * (Nr + 1));
+  for (let i = 0; i < Nk; i++) {
+    W[i] = (keyBytes[4*i] << 24) | (keyBytes[4*i+1] << 16) | (keyBytes[4*i+2] << 8) | keyBytes[4*i+3];
+  }
+  for (let i = Nk; i < 4 * (Nr + 1); i++) {
+    let t = W[i - 1];
+    if (i % Nk === 0) {
+      t = ((AES_SBOX[(t >> 16) & 0xff] << 24) | (AES_SBOX[(t >> 8) & 0xff] << 16) | (AES_SBOX[t & 0xff] << 8) | AES_SBOX[(t >> 24) & 0xff]) ^ (AES_RCON[i / Nk - 1] << 24);
+    }
+    W[i] = (W[i - Nk] ^ t) >>> 0;
+  }
+  return W;
+}
+
+function xtime(a) { return ((a << 1) ^ (a & 0x80 ? 0x1b : 0)) & 0xff; }
+function gmul(a, b) {
+  let p = 0;
+  for (let i = 0; i < 8; i++) {
+    if (b & 1) p ^= a;
+    const hi = a & 0x80;
+    a = (a << 1) & 0xff;
+    if (hi) a ^= 0x1b;
+    b >>= 1;
+  }
+  return p;
+}
+
+function aesAddRoundKey(s, W, round) {
+  for (let c = 0; c < 4; c++) {
+    const w = W[round * 4 + c];
+    s[c*4+0] ^= (w >>> 24) & 0xff;
+    s[c*4+1] ^= (w >>> 16) & 0xff;
+    s[c*4+2] ^= (w >>> 8) & 0xff;
+    s[c*4+3] ^= w & 0xff;
+  }
+}
+function aesSubBytes(s, inv) {
+  const box = inv ? AES_INV_SBOX : AES_SBOX;
+  for (let i = 0; i < 16; i++) s[i] = box[s[i]];
+}
+function aesShiftRows(s, inv) {
+  // state 按列存放: s[c*4+r]
+  const t = s.slice();
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      const shift = inv ? (4 - r) % 4 : r;
+      s[c*4+r] = t[((c + shift) % 4)*4+r];
+    }
+  }
+}
+function aesMixColumns(s, inv) {
+  for (let c = 0; c < 4; c++) {
+    const a = [s[c*4], s[c*4+1], s[c*4+2], s[c*4+3]];
+    let b;
+    if (!inv) {
+      b = [gmul(a[0],2)^gmul(a[1],3)^a[2]^a[3],
+            a[0]^gmul(a[1],2)^gmul(a[2],3)^a[3],
+            a[0]^a[1]^gmul(a[2],2)^gmul(a[3],3),
+            gmul(a[0],3)^a[1]^a[2]^gmul(a[3],2)];
+    } else {
+      b = [gmul(a[0],14)^gmul(a[1],11)^gmul(a[2],13)^gmul(a[3],9),
+            gmul(a[0],9)^gmul(a[1],14)^gmul(a[2],11)^gmul(a[3],13),
+            gmul(a[0],13)^gmul(a[1],9)^gmul(a[2],14)^gmul(a[3],11),
+            gmul(a[0],11)^gmul(a[1],13)^gmul(a[2],9)^gmul(a[3],14)];
+    }
+    for (let r = 0; r < 4; r++) s[c*4+r] = b[r];
+  }
+}
+
+function aesEncryptBlock(block16, W) {
+  const s = block16.slice();
+  aesAddRoundKey(s, W, 0);
+  for (let r = 1; r < 10; r++) {
+    aesSubBytes(s, false); aesShiftRows(s, false); aesMixColumns(s, false); aesAddRoundKey(s, W, r);
+  }
+  aesSubBytes(s, false); aesShiftRows(s, false); aesAddRoundKey(s, W, 10);
+  return s;
+}
+
+function aesDecryptBlock(block16, W) {
+  const s = block16.slice();
+  aesAddRoundKey(s, W, 10);
+  for (let r = 9; r >= 1; r--) {
+    aesShiftRows(s, true); aesSubBytes(s, true); aesAddRoundKey(s, W, r); aesMixColumns(s, true);
+  }
+  aesShiftRows(s, true); aesSubBytes(s, true); aesAddRoundKey(s, W, 0);
+  return s;
+}
+
+/* AES-128-CBC，key/iv 为字符串（按 UTF-8 取 16 字节） */
+function aesCbcEncrypt(plainStr, keyStr, ivStr) {
+  const key = utf8Bytes(keyStr).slice(0, 16);
+  const iv = utf8Bytes(ivStr).slice(0, 16);
+  let data = utf8Bytes(plainStr);
+  const pad = 16 - (data.length % 16);
+  for (let i = 0; i < pad; i++) data.push(pad);
+  const W = aesKeyExpand(key);
+  let prev = iv;
+  const out = [];
+  for (let off = 0; off < data.length; off += 16) {
+    const block = [];
+    for (let i = 0; i < 16; i++) block.push(data[off + i] ^ prev[i]);
+    const enc = aesEncryptBlock(block, W);
+    out.push(...enc);
+    prev = enc;
+  }
+  return out;
+}
+
+function aesCbcDecrypt(cipherBytes, keyStr, ivStr) {
+  const key = utf8Bytes(keyStr).slice(0, 16);
+  const iv = utf8Bytes(ivStr).slice(0, 16);
+  const W = aesKeyExpand(key);
+  let prev = iv;
+  const out = [];
+  for (let off = 0; off < cipherBytes.length; off += 16) {
+    const block = cipherBytes.slice(off, off + 16);
+    const dec = aesDecryptBlock(block, W);
+    for (let i = 0; i < 16; i++) out.push(dec[i] ^ prev[i]);
+    prev = block;
+  }
+  const pad = out[out.length - 1];
+  if (pad < 1 || pad > 16) throw new Error('bad padding');
+  for (let i = 0; i < pad; i++) {
+    if (out[out.length - 1 - i] !== pad) throw new Error('bad padding');
+  }
+  return out.slice(0, out.length - pad);
+}
+
+/* 对外接口：与原脚本语义一致（key/iv 作 UTF-8，输出 base64） */
+function cmEncrypt(plainStr, keyStr, ivStr) {
+  return base64Encode(aesCbcEncrypt(plainStr, keyStr, ivStr || '9791027341711819'));
+}
+
+function cmDecrypt(b64Str, keyStr, ivStr) {
+  const raw = String(b64Str).replace(/[^A-Za-z0-9+/=]/g, '');
+  const bytes = [];
+  for (let i = 0; i < raw.length; i += 4) {
+    const c = [0,1,2,3].map((k) => (raw[i+k] === '=' || !raw[i+k] ? 0 : B64MAP.indexOf(raw[i+k])));
+    const n = (c[0] << 18) | (c[1] << 12) | (c[2] << 6) | c[3];
+    bytes.push((n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff);
+  }
+  const padCount = (raw.match(/=+$/) || [''])[0].length;
+  const trimmed = bytes.slice(0, bytes.length - padCount);
+  return utf8String(aesCbcDecrypt(trimmed, keyStr, ivStr || '9791027341711819'));
+}
+
+function cmMd5(str) { return md5Hex(str); }
+
+
+/* ==================== 常量（逆向所得） ==================== */
+
+// 捕获参数的解密密钥（按 x-qen 选择）
+const REQ_KEY = { '2': 'bAIgvwAuA4tbDr9d', '12': 'V0dSUFZtS1NWRnJa', '14': 'tVkdaRWRY0ZkV1Vr' };
+const REQ_IV  = { '2': '9791027341711819', '12': 'UkdWMVpWTVVWaGVq', '14': 'VjFSQ1ZtVkQxRTlQ' };
+// 查询请求/响应的加解密（x-qen 固定为 '1'）
+const REQ1_KEY = 'foorettD7vcBawt3';
+const RESP1_KEY = 'UVic06tpXgMNiApm';
+const RESP2_KEY = 'GS7VelkJl5IT1uwQ';
+const RESP14_KEY = 'RYV0hCV1lV25KYVJ';
+const RESP14_IV = 'VjFSQ1ZtVkQxRTlQ';
+const DEFAULT_IV = '9791027341711819';
+
+/* ==================== 大网 Token（App 给 H5 页面发票据的接口 getBigNetToken） ==================== */
+function hget(h, n) { try { return h.get(n) || ''; } catch (_) { return ''; } }
+function decAny(text, xpen, xqen) {
+  const tries = [];
+  if (xpen === '1') tries.push(() => cmDecrypt(JSON.parse(text).body, RESP1_KEY, DEFAULT_IV));
+  if (xpen === '2') tries.push(() => cmDecrypt(text, RESP2_KEY, DEFAULT_IV));
+  if (xpen === '14') tries.push(() => cmDecrypt(text, RESP14_KEY, RESP14_IV));
+  if (xqen && REQ_KEY[xqen]) tries.push(() => cmDecrypt(text, REQ_KEY[xqen], REQ_IV[xqen]));
+  tries.push(() => { JSON.parse(text); return text; });
+  for (const q of ['2', '12', '14']) tries.push(() => cmDecrypt(text, REQ_KEY[q], REQ_IV[q]));
+  tries.push(() => cmDecrypt(text, REQ1_KEY, DEFAULT_IV));
+  tries.push(() => cmDecrypt(JSON.parse(text).body, RESP1_KEY, DEFAULT_IV));
+  for (const f of tries) { try { const t = f(); if (t) { JSON.parse(t); return t; } } catch (_) {} }
+  return '';
+}
+function findTokens(o, path, out) {
+  if (!o || typeof o !== 'object') return out;
+  for (const k of Object.keys(o)) {
+    const v = o[k];
+    const p = path ? `${path}.${k}` : k;
+    if (typeof v === 'string' && /token|ticket|jwt/i.test(k) && v.length >= 8) out.push([p, v]);
+    else if (v && typeof v === 'object') findTokens(v, p, out);
+  }
+  return out;
+}
+async function captureBig(ctx) {
+  const side = ctx.response ? 'response' : 'request';
+  const { text, consumed } = await readBody(ctx[side], side);
+  if (!text) return undefined; // 没开 body_required 的那条规则，跳过
+  const h = ctx[side].headers;
+  const plain = decAny(text, String(hget(h, 'x-pen')).trim(), String(hget(ctx.request.headers, 'x-qen')).trim());
+  let obj = null;
+  try { obj = JSON.parse(plain); } catch (_) {}
+  if (side === 'request') {
+    if (obj) {
+      ctx.storage.setJSON(KEY.bigReq, { url: ctx.request.url, xqen: hget(ctx.request.headers, 'x-qen'), enc: text, ts: Date.now() });
+      console.log(`[CMCC诊断] getBigNetToken 请求: ${mask(JSON.stringify(obj)).slice(0, 600)}`);
+    } else console.log(`[CMCC诊断] getBigNetToken 请求未解密 len=${text.length} x-qen=${hget(ctx.request.headers, 'x-qen')}`);
+  } else {
+    if (obj) {
+      const toks = findTokens(obj, '', []);
+      console.log(`[CMCC诊断] getBigNetToken 响应: ${mask(JSON.stringify(obj)).slice(0, 600)}`);
+      if (toks.length) {
+        ctx.storage.setJSON(KEY.big, { toks, ts: Date.now() });
+        let n = {};
+        try { n = ctx.storage.getJSON('cmcc_sign_bignote') || {}; } catch (_) {}
+        if (!n.done) {
+          ctx.storage.setJSON('cmcc_sign_bignote', { done: Date.now() });
+          try { ctx.notify({ title: NAME, subtitle: '抓到签到页票据', body: `字段：${toks.map((t) => t[0]).join('、').slice(0, 80)}。把脚本日志截图发给 Hark 即可` }); } catch (_) {}
+        }
+      }
+    } else console.log(`[CMCC诊断] getBigNetToken 响应未解密 len=${text.length} x-pen=${hget(h, 'x-pen')} 片段=${mask(text).slice(0, 200)}`);
+  }
+  return consumed ? (side === 'request' ? { body: text } : { body: text }) : undefined;
+}
+function bigTokens(ctx) {
+  try { const b = ctx.storage.getJSON(KEY.big); if (b && Date.now() - b.ts < 6 * 3600e3) return b.toks.map((t) => t[1]); } catch (_) {}
+  return [];
 }
 
 /* ==================== 复用中国移动 App 原生登录（与移动小组件同一原理） ==================== */
@@ -327,7 +680,7 @@ async function openSession(ctx, o, cred) {
     if (r.code === 'SUCCESS' && r.data) data = r.data;
     else console.log(`[CMCC] jwt 续期失败：${r.code} ${r.msg || ''}`);
   }
-  for (const tk of [cred.token, appToken(ctx)].filter((v, i, a) => v && a.indexOf(v) === i)) {
+  for (const tk of [cred.token, appToken(ctx), ...bigTokens(ctx)].filter((v, i, a) => v && a.indexOf(v) === i)) {
     if (data) break;
     const r = await json(await req(ctx, jar, 'POST', loginUrl, { body: { ...base, jwtToken: null, token: tk }, headers: jsonHdr }));
     if (r.code === 'SUCCESS' && r.data) data = r.data;
@@ -369,7 +722,7 @@ async function signOnce(ctx, o) {
   const cred = getCred(ctx);
   const live = liveSession(ctx);
   const hasId = cred.userCheckId || phoneOf(ctx);
-  const hasTk = cred.jwt || cred.token || appToken(ctx);
+  const hasTk = cred.jwt || cred.token || appToken(ctx) || bigTokens(ctx).length;
   if (!live && !hasId) {
     return { ok: false, need: true, msg: '缺手机号：在 Egern 本模块设置里填「手机号」' };
   }
@@ -567,7 +920,10 @@ export default async function (ctx) {
   const o = opts(ctx);
   if (ctx.request && ctx.request.url) {
     if (!o.capture) return;
-    if (/^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)/.test(ctx.request.url)) { captureApp(ctx); return; }
+    if (/^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)/.test(ctx.request.url)) {
+      if (/obtainToken\/getBigNetToken/.test(ctx.request.url)) return captureBig(ctx);
+      captureApp(ctx); return;
+    }
     const isLogin = /\/qwhdsso\/appTokenLogin/.test(ctx.request.url);
     if (!/\/qwhd(sso|hub)\//.test(ctx.request.url)) {
       if (ctx.response) await captureAnyResponse(ctx); else markSeen(ctx, ctx.request.url);
