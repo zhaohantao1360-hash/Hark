@@ -841,19 +841,32 @@ async function signBj(ctx) {
   const today = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const it = (j.signInList || []).find((x) => x.signInDate === today);
   if (!j.isSignIn && !it) throw new Error('签到没生效（接口返回未签）');
-  // 附加信息（失败不影响签到结果）：月度连签状态
+  // 附加：月度连签奖励（signStatus=1 且 prizeStatus=0 时 POST customPrize?month= 领取，2026-10 抓包确认）+ 流量树奖励果
   let months = [];
-  try {
-    const tok = (ctx.storage.getJSON(KEY_BJS) || {}).tok;
-    if (tok) {
-      const m = await bjCall(ctx, 'GET', `/ActSignIn2023/ContinuousSignIn/getActivityMain/JT/ContinuousSignIn2026?token=${encodeURIComponent(tok)}&transactionid=${Date.now()}`);
-      await diag(ctx, `MONTH → ${m.status} ${m.text.slice(0, 600)}`);
-      const list = (m.j && (m.j.list || (m.j.data && m.j.data.list))) || [];
-      months = list.map((x) => ({ month: String(x.month || ''), signStatus: String(x.signStatus ?? ''), prizeStatus: String(x.prizeStatus ?? ''), prize: String(x.signPrize || '') }));
-    }
-  } catch (_) {}
+  const extra = [];
+  const tok = (() => { try { return (ctx.storage.getJSON(KEY_BJS) || {}).tok; } catch (_) { return ''; } })();
+  if (tok) {
+    const q = `token=${encodeURIComponent(tok)}`;
+    try {
+      const m = await bjCall(ctx, 'POST', `/ActSignIn2023/ContinuousSignIn/getActivityMain/JT/ContinuousSignIn2026?${q}&transactionid=${Date.now()}`);
+      const list = (m.j && m.j.list) || [];
+      for (const x of list) {
+        if (String(x.signStatus) === '1' && String(x.prizeStatus) === '0') {
+          const r = await bjCall(ctx, 'POST', `/ActSignIn2023/ContinuousSignIn/customPrize/JT/ContinuousSignIn2026?${q}&month=${x.month}&transactionid=${Date.now()}`);
+          await diag(ctx, `MONTHPRIZE ${x.month} → ${r.status} ${r.text.slice(0, 500)}`);
+          const pl = (r.j && r.j.prizelist) || [];
+          if (r.j && String(r.j.result) === '0') { x.prizeStatus = 1; pl.forEach((p) => p && p.prizeName && extra.push(`${x.month}月连签：${p.prizeName}`)); }
+        }
+      }
+      months = list.map((x) => ({ month: String(x.month || ''), signStatus: String(x.signStatus ?? ''), prizeStatus: String(x.prizeStatus ?? '') }));
+    } catch (e) { await diag(ctx, `MONTH 出错 ${e && e.message}`); }
+    try {
+      const f = await bjCall(ctx, 'GET', `/task-system/getTaskFruitSt?timestamp=${Date.now()}&transactionid=${Date.now()}&channel=JT&${q}`);
+      await diag(ctx, `FRUIT → ${f.status} ${f.text.slice(0, 300)}`);
+    } catch (_) {}
+  }
   const days = (j.signInList || []).map((x) => ({ d: x.signInDate, p: x.signInPrize || '' }));
-  return { ok: true, lines: ['签到成功'], prizes: it && it.signInPrize ? [it.signInPrize] : [], days, cards: Number(j.signCardNum || 0), months };
+  return { ok: true, lines: ['签到成功'], prizes: [...(it && it.signInPrize ? [it.signInPrize] : []), ...extra], days, cards: Number(j.signCardNum || 0), months };
 }
 
 async function signOnce(ctx, o) {
@@ -1162,10 +1175,10 @@ async function traceWx(ctx) {
   const u = ctx.request.url;
   const bj = /^https?:\/\/h5\.bj\.10086\.cn/.test(u);
   if (/\/qwhd(sso|hub)\//.test(u) || /\.(js|css|png|jpe?g|gif|svg|webp|woff2?|ttf|ico|mp4|mp3)(\?|$)/i.test(u)) return undefined;
-  const nk = bj ? 'cmcc_sign_bjtrace2_n' : 'cmcc_sign_trace_n';
+  const nk = bj ? 'cmcc_sign_bjtrace3_n' : 'cmcc_sign_trace_n';
   let n = 0;
   try { n = Number(ctx.storage.get(nk) || 0); } catch (_) {}
-  if (n >= (bj ? 120 : 60)) return undefined;
+  if (n >= (bj ? 400 : 60)) return undefined;
   ctx.storage.set(nk, String(n + 1));
   const side = ctx.response ? 'response' : 'request';
   const { text, consumed } = await readBody(ctx[side], side);
