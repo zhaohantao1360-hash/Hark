@@ -736,7 +736,8 @@ async function diag(ctx, line) {
 function bjHeaders() {
   return {
     'User-Agent': UA, Accept: 'application/json, text/plain, */*', 'Accept-Language': 'zh-CN,zh-Hans;q=0.9',
-    Origin: BJ, Referer: 'https://h5.bj.10086.cn/cmcc_app/checkin/index.html', 'Content-Type': 'application/x-www-form-urlencoded',
+    // 不带 Origin：服务端 CORS 过滤会把它判成跨域直接 403
+    Referer: 'https://h5.bj.10086.cn/cmcc_app/checkin/index.html',
   };
 }
 async function bjCall(ctx, method, path) {
@@ -770,8 +771,8 @@ async function fetchBigToken(ctx, phone) {
   const cookie = appCookieStr(ctx);
   const jsid = (cookie.match(/JSESSIONID=([^;]+)/) || [])[1] || 'null';
   const tries = [
-    { host: 'app.10086.cn', t: 'orig' }, { host: 'app.10086.cn', t: 'cookie' },
-    { host: 'client.app.coc.10086.cn', t: 'orig' }, { host: 'raw' },
+    // 2026-10-22 真机验证：client.app.coc + 原 t 可用；app.10086.cn 该路径 404
+    { host: 'client.app.coc.10086.cn', t: 'orig' }, { host: 'client.app.coc.10086.cn', t: 'cookie' }, { host: 'raw' },
   ];
   for (const v of tries) {
     try {
