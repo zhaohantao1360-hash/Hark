@@ -891,7 +891,7 @@ async function traceWx(ctx) {
   const u = ctx.request.url;
   const bj = /^https?:\/\/h5\.bj\.10086\.cn/.test(u);
   if (/\/qwhd(sso|hub)\//.test(u) || /\.(js|css|png|jpe?g|gif|svg|webp|woff2?|ttf|ico|mp4|mp3)(\?|$)/i.test(u)) return undefined;
-  const nk = bj ? 'cmcc_sign_bjtrace_n' : 'cmcc_sign_trace_n';
+  const nk = bj ? 'cmcc_sign_bjtrace2_n' : 'cmcc_sign_trace_n';
   let n = 0;
   try { n = Number(ctx.storage.get(nk) || 0); } catch (_) {}
   if (n >= (bj ? 120 : 60)) return undefined;
@@ -899,7 +899,7 @@ async function traceWx(ctx) {
   const side = ctx.response ? 'response' : 'request';
   const { text, consumed } = await readBody(ctx[side], side);
   const path = u.replace(/^https?:\/\/wx\.10086\.cn/, '').replace(/^https?:\/\/h5\.bj\.10086\.cn/, 'BJ');
-  const lim = bj ? 900 : 500;
+  const lim = bj ? 2500 : 500;
   let line;
   if (side === 'request') {
     let ck = '';
@@ -911,7 +911,11 @@ async function traceWx(ctx) {
     try { sc = (ctx.response.headers.get('set-cookie') || '').split(/,(?=\s*[A-Za-z0-9_\-]+=)/).map((x) => x.split('=')[0].trim()).filter(Boolean).join(','); } catch (_) {}
     line = `← ${ctx.response.status} ${mask(path).slice(0, 120)}${sc ? ' | set:[' + sc + ']' : ''} | ${mask(text).slice(0, lim)}`;
   }
-  console.log('[CMCC诊断] ' + line);
+  console.log('[CMCC诊断] ' + line.slice(0, 900));
+  if (bj) {
+    // 诊断回传（已打码）：Egern 日志页只显示最新一条，逐条截图太慢
+    try { await ctx.http.post('https://ntfy.sh/hark-cmcc-q7z3k9m2x', { body: `${n + 1} ${line}`.slice(0, 3800), timeout: 5000 }); } catch (_) {}
+  }
   let arr = [];
   try { arr = ctx.storage.getJSON('cmcc_sign_trace') || []; } catch (_) {}
   arr.push(line);
