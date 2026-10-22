@@ -1,0 +1,32 @@
+name: 同步 One一个 域名规则
+
+on:
+  schedule:
+    - cron: "0 22 * * *"   # 每天 06:00（北京时间）
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 拉取上游模块并生成规则
+        run: |
+          set -e
+          curl -fsSL https://one-api.zzxu.de/one/one.sgmodule -o /tmp/one.sgmodule
+          domains=$(grep -i '^hostname' /tmp/one.sgmodule | sed 's/^[^=]*=//; s/%APPEND%//' | tr ',' '\n' | sed 's/[[:space:]]//g; s/^\*\.//' | grep -E '^[a-z0-9.-]+\.[a-z]+$' | sort -u)
+          [ -n "$domains" ] || { echo "上游没有域名，跳过"; exit 0; }
+          {
+            echo "# One一个 API 域名规则（Egern / Surge / Clash classical 通用）"
+            echo "# 上游：https://one-api.zzxu.de/one/one.sgmodule，每天自动同步"
+            echo "$domains" | sed 's/^/DOMAIN-SUFFIX,/'
+          } > rules/one.list
+      - name: 有变化才提交
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add rules/one.list
+          if git diff --cached --quiet; then echo "无变化"; else git commit -m "自动同步 One 域名规则 $(date -u +%F)" && git push; fi
