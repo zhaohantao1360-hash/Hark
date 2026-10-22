@@ -528,6 +528,39 @@ function widget(ctx, rec) {
   return { type: 'widget', padding: 14, children };
 }
 
+/* ==================== 抓包诊断（wx.10086.cn 非 qwhd 接口，排查北京签到页走的接口） ==================== */
+function mask(t) {
+  return String(t || '')
+    .replace(/((?:token|jwt|ticket|session|sid|JSESSIONID|UID|SESSION)[A-Za-z_]*["']?\s*[=:]\s*["']?)([^"'&;,\s]{6})[^"'&;,\s]*/gi, '$1$2***')
+    .replace(/1[3-9]\d{9}/g, (m) => m.slice(0, 3) + '****' + m.slice(7));
+}
+async function traceWx(ctx) {
+  const u = ctx.request.url;
+  if (/\/qwhd(sso|hub)\//.test(u) || /\.(js|css|png|jpe?g|gif|svg|webp|woff2?|ttf|ico)(\?|$)/i.test(u)) return undefined;
+  let n = 0;
+  try { n = Number(ctx.storage.get('cmcc_sign_trace_n') || 0); } catch (_) {}
+  if (n >= 60) return undefined;
+  ctx.storage.set('cmcc_sign_trace_n', String(n + 1));
+  const side = ctx.response ? 'response' : 'request';
+  const { text, consumed } = await readBody(ctx[side], side);
+  const path = u.replace(/^https:\/\/wx\.10086\.cn/, '');
+  let line;
+  if (side === 'request') {
+    let ck = '';
+    try { ck = ctx.request.headers.get('cookie') || ''; } catch (_) {}
+    const names = ck.split(/;\s*/).map((x) => x.split('=')[0]).filter(Boolean).join(',');
+    line = `→ ${ctx.request.method || ''} ${mask(path).slice(0, 160)} | ck:[${names.slice(0, 160)}] | ${mask(text).slice(0, 500)}`;
+  } else {
+    line = `← ${ctx.response.status} ${mask(path).slice(0, 100)} | ${mask(text).slice(0, 500)}`;
+  }
+  console.log('[CMCC诊断] ' + line);
+  let arr = [];
+  try { arr = ctx.storage.getJSON('cmcc_sign_trace') || []; } catch (_) {}
+  arr.push(line);
+  ctx.storage.setJSON('cmcc_sign_trace', arr.slice(-40));
+  return consumed ? { body: text } : undefined;
+}
+
 /* ==================== 入口 ==================== */
 
 export default async function (ctx) {
@@ -536,6 +569,10 @@ export default async function (ctx) {
     if (!o.capture) return;
     if (/^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)/.test(ctx.request.url)) { captureApp(ctx); return; }
     const isLogin = /\/qwhdsso\/appTokenLogin/.test(ctx.request.url);
+    if (!/\/qwhd(sso|hub)\//.test(ctx.request.url)) {
+      if (ctx.response) await captureAnyResponse(ctx); else markSeen(ctx, ctx.request.url);
+      return traceWx(ctx);
+    }
     if (ctx.response) {
       await captureAnyResponse(ctx);
       return isLogin ? captureResponse(ctx) : undefined;
