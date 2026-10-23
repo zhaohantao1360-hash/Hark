@@ -30,6 +30,11 @@ env_schema:
     description: 打开签到页时自动更新凭证。关掉后凭证过期不会自动恢复
     default_value: 'true'
     options: ['true', 'false']
+  CMCC_TRACE:
+    name: 诊断日志
+    description: 调试用：进签到页和签到时把打码后的接口记录回传给 Hark 排查问题。调好后关掉即可
+    default_value: 'true'
+    options: ['true', 'false']
 
 mitm:
   hostnames:
@@ -43,59 +48,59 @@ scriptings:
   - http_request:
       name: 移动签到凭证-请求
       match: '^https:\/\/wx\.10086\.cn\/'
-      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945b
       body_required: true
       timeout: 30
   - http_response:
       name: 移动签到凭证-响应
       match: '^https:\/\/wx\.10086\.cn\/'
-      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945b
       body_required: true
       timeout: 30
   - http_request:
       name: 北京签到页-请求
       match: '^https:\/\/h5\.bj\.10086\.cn\/'
-      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945b
       body_required: true
       timeout: 15
   - http_response:
       name: 北京签到页-响应
       match: '^https:\/\/h5\.bj\.10086\.cn\/'
-      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945b
       body_required: true
       timeout: 15
   - http_request:
       name: 移动签到页票据-请求
       match: '^https?:\/\/client\.app\.coc\.10086\.cn\/leadeon-abilityopen-biz\/BN\/obtainToken\/getBigNetToken'
-      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945b
       body_required: true
       timeout: 10
   - http_response:
       name: 移动签到页票据-响应
       match: '^https?:\/\/client\.app\.coc\.10086\.cn\/leadeon-abilityopen-biz\/BN\/obtainToken\/getBigNetToken'
-      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945b
       body_required: true
       timeout: 10
   - http_request:
       name: 移动App登录信息-请求
       match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
-      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945b
       timeout: 10
   - http_response:
       name: 移动App登录信息-响应
       match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
-      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945b
       timeout: 10
   - schedule:
       name: 移动每日签到-Hark
       cron: '18 9,13,20 * * *'
-      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945b
       timeout: 90
       env:
         MODE: sign
   - generic:
       name: 移动签到-Hark
-      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945
+      script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/cmcc-sign-hark.js?v=20261023-0945b
       timeout: 60
 
 widgets:

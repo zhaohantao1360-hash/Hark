@@ -39,6 +39,7 @@ function opts(ctx) {
     claim: clean(e.CMCC_CLAIM) !== 'false',
     notify: ['all', 'fail', 'off'].includes(clean(e.CMCC_NOTIFY)) ? clean(e.CMCC_NOTIFY) : 'all',
     capture: clean(e.CMCC_CAPTURE) !== 'false',
+    trace: clean(e.CMCC_TRACE) !== 'false',
     mode: clean(e.MODE).toLowerCase(),
   };
 }
@@ -735,6 +736,7 @@ const BIG_PATH = '/leadeon-abilityopen-biz/BN/obtainToken/getBigNetToken';
 const KEY_BJS = 'cmcc_sign_bjs';
 const DIAG_URL = 'https://ntfy.sh/hark-cmcc-q7z3k9m2x';
 async function diag(ctx, line) {
+  if (!opts(ctx).trace) return;
   console.log('[CMCC诊断] ' + String(line).slice(0, 900));
   try { await ctx.http.post(DIAG_URL, { body: mask(String(line)).slice(0, 3800), timeout: 5000 }); } catch (_) {}
 }
@@ -1213,10 +1215,11 @@ function mask(t) {
     .replace(/1[3-9]\d{9}/g, (m) => m.slice(0, 3) + '****' + m.slice(7));
 }
 async function traceWx(ctx) {
+  if (!opts(ctx).trace) return undefined;
   const u = ctx.request.url;
   const bj = /^https?:\/\/h5\.bj\.10086\.cn/.test(u);
   if (/\/qwhd(sso|hub)\//.test(u) || /\.(js|css|png|jpe?g|gif|svg|webp|woff2?|ttf|ico|mp4|mp3)(\?|$)/i.test(u)) return undefined;
-  const nk = bj ? 'cmcc_sign_bjtrace3_n' : 'cmcc_sign_trace_n';
+  const nk = bj ? 'cmcc_sign_bjtrace4_n' : 'cmcc_sign_trace_n';
   let n = 0;
   try { n = Number(ctx.storage.get(nk) || 0); } catch (_) {}
   if (n >= (bj ? 400 : 60)) return undefined;
