@@ -402,7 +402,12 @@ async function captureBig(ctx) {
   try { obj = JSON.parse(plain); } catch (_) {}
   if (side === 'request') {
     if (obj) {
-      ctx.storage.setJSON(KEY.bigReq, { url: ctx.request.url, xqen: hget(ctx.request.headers, 'x-qen'), enc: text, ts: Date.now() });
+      // App 给每个 H5 页面都调 getBigNetToken（sourceid 各不相同）。只认签到页那次，别让其他页面覆盖
+      const rb = (obj && (obj.reqBody || (obj.body && obj.body.reqBody))) || {};
+      const isSign = /h5\.bj\.10086\.cn/.test(String(rb.url || '')) || String(rb.sourceid || '') === '026033';
+      let had = null;
+      try { had = ctx.storage.getJSON(KEY.bigReq); } catch (_) {}
+      if (isSign || !had) ctx.storage.setJSON(KEY.bigReq, { url: ctx.request.url, xqen: hget(ctx.request.headers, 'x-qen'), enc: text, ts: Date.now(), sign: isSign });
       console.log(`[CMCC诊断] getBigNetToken 请求: ${mask(JSON.stringify(obj)).slice(0, 600)}`);
     } else console.log(`[CMCC诊断] getBigNetToken 请求未解密 len=${text.length} x-qen=${hget(ctx.request.headers, 'x-qen')}`);
   } else {
@@ -778,11 +783,13 @@ async function fetchBigToken(ctx, phone) {
     try {
       let url, headers, body;
       if (v.host === 'raw') {
+        if (!br.sign) continue; // 抓到的不是签到页的请求，原样重放只会换到别的页面的票据
         url = br.url; body = br.enc;
         headers = { 'x-qen': String(br.xqen || ''), 'Content-Type': 'application/json;charset=UTF-8', 'User-Agent': 'ChinaMobile/12.5.5 (iPhone; iOS 26.1)', Cookie: cookie };
       } else {
         const ts = Date.now(); const nonce = randDigits(8);
-        const bodyObj = { ...params, reqBody: { sourceid: '026033', appId: '', url: BJ_PAGE, ...(params.reqBody || {}), cellNum: phone } };
+        // sourceid/url 必须放在后面：抓到的 reqBody 可能来自别的页面，会换出「token与目标sourceid」不匹配的票据（2026-10-23 104228）
+        const bodyObj = { ...params, reqBody: { ...(params.reqBody || {}), sourceid: '026033', appId: '', url: BJ_PAGE, cellNum: phone } };
         if (v.t === 'cookie') bodyObj.t = cookie;
         body = cmEncrypt(JSON.stringify(bodyObj), REQ1_KEY, DEFAULT_IV);
         const tokenEnc = cmEncrypt(`${params.xk || ''}_${BIG_PATH}_${ts}_${nonce}`, REQ1_KEY, DEFAULT_IV);
