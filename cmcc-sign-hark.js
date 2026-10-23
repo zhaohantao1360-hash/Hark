@@ -846,8 +846,20 @@ async function signBj(ctx) {
   if (!j || Number(j.result) !== 0) throw new Error(`签到接口异常：${(j && j.errmsg) || '无响应'}`);
   const d = new Date();
   const today = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  const it = (j.signInList || []).find((x) => x.signInDate === today);
-  if (!j.isSignIn && !it) throw new Error('签到没生效（接口返回未签）');
+  let it = (j.signInList || []).find((x) => x.signInDate === today);
+  let signPrize = '';
+  if (!j.isSignIn && !it) {
+    // getSignIn 只是查状态；真正签到是页面按钮调 doPrize?type=sign（2026-10-23 从签到页 index.js 确认）
+    const tk = (() => { try { return (ctx.storage.getJSON(KEY_BJS) || {}).tok; } catch (_) { return ''; } })();
+    const r = await bjCall(ctx, 'POST', `/ActSignIn2023/doPrize/JT/ActSignIn2023JT?type=sign&constid=&token=${encodeURIComponent(tk)}&transactionid=${Date.now()}`);
+    await diag(ctx, `DOSIGN → ${r.status} ${r.text.slice(0, 500)}`);
+    if (!(r.j && Number(r.j.result) === 0)) throw new Error(`签到失败：${(r.j && r.j.errmsg) || r.status}`);
+    const pl = r.j.prizelist || [];
+    signPrize = (pl[0] && (pl[0].prizeName || pl[0].signInPrize)) || '';
+    it = { signInDate: today, signInPrize: signPrize };
+    j.signInList = [...(j.signInList || []), it];
+    j.isSignIn = true;
+  }
   // 附加：月度连签奖励（signStatus=1 且 prizeStatus=0 时 POST customPrize?month= 领取，2026-10 抓包确认）+ 流量树奖励果
   let months = [];
   const extra = [];
