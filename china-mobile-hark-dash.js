@@ -464,6 +464,7 @@ async function handleCapture(ctx) {
 
   if (changed) {
     ctx.storage.set(STORE.loginTs, String(Date.now()));
+    ctx.storage.set('cm_expire_fails', '0');
     if (shouldNotify) {
       ctx.notify({ title: '中国移动', body: wasExpired ? '登录已恢复，小组件将自动更新' : '登录参数捕获成功，小组件将自动更新' });
       if (wasExpired) ctx.storage.set('cm_expire_notify', '0');
@@ -610,13 +611,13 @@ function absorbSetCookie(ctx, headers) {
   return false;
 }
 
-// 登录过期时：重放捕获到的 autoLogin 请求换新 Cookie（10 分钟内最多一次）
+// 登录过期时：重放捕获到的 autoLogin 请求换新 Cookie（5 分钟内最多一次）
 async function autoRefreshSession(ctx) {
   const url = ctx.storage.get(STORE.loginUrl) || '';
   const body = ctx.storage.get(STORE.paramsEnc) || '';
   if (!url || !body) return false;
   const last = parseInt(ctx.storage.get(STORE.refreshTs) || '0', 10);
-  if (Date.now() - last < 10 * 60 * 1000) return false;
+  if (Date.now() - last < 5 * 60 * 1000) return false;
   ctx.storage.set(STORE.refreshTs, String(Date.now()));
   let headers = {};
   try { headers = ctx.storage.getJSON(STORE.loginHeaders) || {}; } catch (e) {}
@@ -627,8 +628,10 @@ async function autoRefreshSession(ctx) {
   if (oldCookie) headers['Cookie'] = oldCookie;
   try {
     const resp = await ctx.http.post(url, { headers, body, timeout: 15000 });
-    const ok = !!resp && resp.status === 200 && absorbSetCookie(ctx, resp.headers);
-    dlog(ctx, `自动续期 HTTP=${resp ? resp.status : 'no-resp'} 新Cookie=${ok}`);
+    const got = !!resp && absorbSetCookie(ctx, resp.headers);
+    // 只要 HTTP 200 就再查一次：有的续期不换 JSESSIONID 但会话已被刷新
+    const ok = !!resp && resp.status === 200;
+    dlog(ctx, `自动续期 HTTP=${resp ? resp.status : 'no-resp'} 新Cookie=${got}`);
     return ok;
   } catch (e) {
     dlog(ctx, `自动续期失败: ${String((e && e.message) || e).slice(0, 80)}`);
@@ -1375,12 +1378,16 @@ async function handleKeepAlive(ctx) {
   const expired = r.configured && (r.stage === 'session' || !r.ds || r.fromCache);
   dlog(ctx, `保活 ${expired ? '失败:' + (r.error || '') : '成功'}`);
   if (expired && r.stage === 'session') {
+    // 连续 3 次（约 1 小时）都判过期才提醒，避免接口偶发空壳误报
+    const fails = parseInt(ctx.storage.get('cm_expire_fails') || '0', 10) + 1;
+    ctx.storage.set('cm_expire_fails', String(fails));
     const last = parseInt(ctx.storage.get('cm_expire_notify') || '0', 10);
-    if (Date.now() - last > 6 * 3600 * 1000) {
+    if (fails >= 3 && Date.now() - last > 6 * 3600 * 1000) {
       ctx.storage.set('cm_expire_notify', String(Date.now()));
       ctx.notify({ title: '中国移动', body: '登录已过期，打开「中国移动」App 停留几秒即可恢复' });
     }
   } else if (!expired) {
     ctx.storage.set('cm_expire_notify', '0');
+    ctx.storage.set('cm_expire_fails', '0');
   }
 }
