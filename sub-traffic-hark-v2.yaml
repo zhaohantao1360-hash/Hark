@@ -80,7 +80,7 @@ env_schema:
 scriptings:
 - generic:
     name: 订阅流量监控-Hark2
-    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/sub-traffic-hark-v2.js
+    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/sub-traffic-hark-v2.js?v=20261025-1420
     timeout: 30
 widgets:
 - name: 订阅流量监控-Hark2
