@@ -9,11 +9,7 @@
 
 // 会话、验证码、缓存按登录手机号分开存，多个账号的小组件互不覆盖
 function uk(base, user) { return `${base}_${md5hex(String(user)).slice(0, 8)}`; }
-const K = { data: 'sgcc_hark_data2', err: 'sgcc_hark_err2', lock: 'sgcc_hark_lock', dev: 'sgcc_app_dev', sess: 'sgcc_app_sess', sms: 'sgcc_app_sms', lbo: 'sgcc_app_login_backoff' };
-// 只有这些错误码说明会话/账号本身有问题，遇到要停下，不再继续查别的接口
-const AUTH_CODES = ['-200', '-201', '4006', 'RK008', '0100', 'backoff'];
-// 国网拒绝登录（如 101009 系统正忙）后的跨运行登录退避，单位分钟；登录成功清零
-const LOGIN_BACKOFF = [15, 30, 60, 120, 240];
+const K = { data: 'sgcc_hark_data2', err: 'sgcc_hark_err2', lock: 'sgcc_hark_lock', dev: 'sgcc_app_dev', sess: 'sgcc_app_sess', sms: 'sgcc_app_sms' };
 
 function clean(v) { return String(v == null ? '' : v).trim(); }
 function num(v) { if (typeof v === 'number') return Number.isFinite(v) ? v : NaN; const n = Number(String(v == null ? '' : v).replace(/[^\d.-]/g, '')); return Number.isFinite(n) && String(v == null ? '' : v).trim() !== '' ? n : NaN; }
@@ -307,7 +303,7 @@ function loginParams(account, password, code, codeKey) {
 }
 
 class SgApp {
-  constructor(ctx, user, pass) { this.ctx = ctx; this.user = user; this.pass = pass; this.policy = clean((ctx.env || {}).SGCC_POLICY) || 'DIRECT'; this.dev = null; this.sess = null; this.loginErr = null; }
+  constructor(ctx, user, pass) { this.ctx = ctx; this.user = user; this.pass = pass; this.policy = clean((ctx.env || {}).SGCC_POLICY) || 'DIRECT'; this.dev = null; this.sess = null; }
   sk(base) { return uk(base, this.user); }
   st(k, v) { try { if (v === undefined) return this.ctx.storage.getJSON(k); this.ctx.storage.setJSON(k, v); } catch (_) { return null; } return null; }
   device() {
@@ -396,27 +392,14 @@ class SgApp {
       this.st(this.sk(K.sms), { ...pend, used: sms });
       return this.login(sms, pend.codeKey);
     }
-    // 一次运行只登录一次：前面已经失败过，后面的接口直接复用这个错误，不再重复登录
-    if (this.loginErr) throw this.loginErr;
-    const bo = this.st(this.sk(K.lbo)) || {};
-    if (bo.until && Date.now() < bo.until) {
-      const left = Math.ceil((bo.until - Date.now()) / 60000);
-      throw (this.loginErr = new SgError('backoff', `国网暂时拒绝登录（${bo.msg || '系统繁忙'}），${left} 分钟后自动重试`));
-    }
-    try { const s = await this.login(); if (bo.n) this.st(this.sk(K.lbo), {}); return s; }
+    try { return await this.login(); }
     catch (e) {
-      this.loginErr = e;
-      // 服务器明确拒绝（非网络、非密码错误、非新设备验证）时递增退避，避免反复登录把限流拖得更久
-      if (!['4006', '0100', 'net', 'RK008'].includes(e.code)) {
-        const n = Math.min((bo.n || 0) + 1, LOGIN_BACKOFF.length);
-        this.st(this.sk(K.lbo), { n, until: Date.now() + LOGIN_BACKOFF[n - 1] * 60000, msg: clean(e.message).slice(0, 40) });
-      }
       if (e.code !== '4006') throw e;
       if (!pendOk || Date.now() - pend.ts > 5 * 60000) {
         const codeKey = await this.sendDeviceSms();
         this.st(this.sk(K.sms), { user: this.user, codeKey, ts: Date.now(), used: sms });
       }
-      throw (this.loginErr = new SgError('4006', `国网要验证新设备：验证码已发到 ${this.user.slice(0, 3)}****${this.user.slice(-4)}，填到「短信验证码」（SGCC_SMS）里保存，再刷新小组件`));
+      throw new SgError('4006', `国网要验证新设备：验证码已发到 ${this.user.slice(0, 3)}****${this.user.slice(-4)}，填到「短信验证码」（SGCC_SMS）里保存，再刷新小组件`);
     }
   }
   async authed(path, payload) {
@@ -445,16 +428,9 @@ function consType(a) { return a.elec === '04' || (a.elec === '02' && a.pro === '
 function ymd(y, m, d) { return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`; }
 function monthRange(y, m) { return [ymd(y, m, 1), ymd(y, m, new Date(Date.UTC(y, m, 0)).getUTCDate())]; }
 
-async function queryAccount(app, a, prev, prevTs) {
+async function queryAccount(app, a) {
   const n = cnNow();
-  // 余额是小组件最主要的数据，先查；日用电、月账单出错不再连累余额
-  let bal = null;
-  try {
-    const d = await app.authed(P_BAL, { serviceCode: '0101143', source: 'app', target: a.pro, data: { srvCode: '', serialNo: '', channelCode: '0902', funcCode: 'A1007200', acctId: app.sess.userId, userName: 'acctid01', promotType: '1', promotCode: '1', userAccountId: app.sess.userId, list: [{ consNoSrc: a.src, proCode: a.pro, sceneType: a.elec, consNo: a.consNo, orgNo: a.org }] } });
-    bal = (Array.isArray(d.list) ? d.list : []).find((x) => x && typeof x === 'object') || null;
-  } catch (e) { if (AUTH_CODES.includes(e.code)) throw e; }
   const daily = [];
-  let dayStale = false;
   let monthTotal = NaN;
   for (let off = 0; off < 2; off++) {
     let y = n.y, m = n.m - off; if (m < 1) { m += 12; y -= 1; }
@@ -463,17 +439,7 @@ async function queryAccount(app, a, prev, prevTs) {
       const d = await app.authed(P_DAILY, { serviceCode: 'BCP_000026', source: 'app', target: a.pro, data: { acctId: 'acctid01', channelCode: 'SGAPP', consNo: a.src, consNosrc: a.src, endTime: e, consType: consType(a), funcCode: 'ALIPAY_01', orgNo: a.org, proCode: a.pro, promotCode: '1', promotType: '1', serialNo: '', srvCode: '', startTime: s, userName: 'acctid01' } });
       (Array.isArray(d.sevenEleList) ? d.sevenEleList : []).forEach((x) => daily.push({ day: x.day, dayElePq: x.dayElePq }));
       if (off === 0) monthTotal = num(d.totalPq);
-    } catch (e) {
-      if (AUTH_CODES.includes(e.code)) throw e;
-      if (off === 0 && !daily.length) {
-        // 当月日用电失败：拿到了余额就沿用上次缓存的日用电并标记为旧数据，否则按失败处理
-        const old = prev && prev.dayElecQuantity31 && prev.dayElecQuantity31.sevenEleList;
-        if (!bal) throw e;
-        if (Array.isArray(old)) old.forEach((x) => daily.push(x));
-        dayStale = true; if (prev) monthTotal = num(prev.monthTotal);
-        break;
-      }
-    }
+    } catch (e) { if (off === 0 && !daily.length) throw e; }
   }
   let bills = [], yearPq = NaN, yearAmt = NaN;
   for (const y of [n.y, n.y - 1]) {
@@ -491,8 +457,13 @@ async function queryAccount(app, a, prev, prevTs) {
       if (y === n.y) { yearPq = num(d.yearPq); yearAmt = num(d.yearAmt); if (!Number.isFinite(yearPq) && list.length) yearPq = list.reduce((s, x) => s + (x.monthEleNum || 0), 0); if (!Number.isFinite(yearAmt) && list.length) yearAmt = list.reduce((s, x) => s + (x.monthEleCost || 0), 0); }
       bills = list.concat(bills);
       if (list.length && y === n.y && n.m > 1) break;
-    } catch (e) { if (AUTH_CODES.includes(e.code)) throw e; break; }
+    } catch (e) { if (['-200', '-201', '4006', 'RK008'].includes(e.code)) throw e; break; }
   }
+  let bal = null;
+  try {
+    const d = await app.authed(P_BAL, { serviceCode: '0101143', source: 'app', target: a.pro, data: { srvCode: '', serialNo: '', channelCode: '0902', funcCode: 'A1007200', acctId: app.sess.userId, userName: 'acctid01', promotType: '1', promotCode: '1', userAccountId: app.sess.userId, list: [{ consNoSrc: a.src, proCode: a.pro, sceneType: a.elec, consNo: a.consNo, orgNo: a.org }] } });
+    bal = (Array.isArray(d.list) ? d.list : []).find((x) => x && typeof x === 'object') || null;
+  } catch (e) { if (['-200', '-201', '4006', 'RK008'].includes(e.code)) throw e; }
   // 转成和原兼容层一致的结构，界面层不用改
   let sumMoney = NaN, owe = 0;
   if (bal) {
@@ -508,30 +479,20 @@ async function queryAccount(app, a, prev, prevTs) {
     dayElecQuantity31: { sevenEleList: daily },
     monthElecQuantity: { mothEleList: bills, dataInfo: { totalEleNum: yearPq, totalEleCost: yearAmt } },
     monthTotal,
-    _ts: Date.now(),
-    ...(dayStale ? { _dayStale: true } : {}),
-    // 余额没拿到：沿用上次缓存的余额，并按缓存时间显示「更新于」，不误报成刚更新
-    ...(!bal && prev && prev.eleBill ? { eleBill: prev.eleBill, _ts: prev._ts || prevTs || Date.now(), _balStale: true } : {}),
   };
 }
 
-function accKey(x) { const u = (x && x.userInfo) || {}; return clean(u.consNo || u.consNo_dst); }
-async function runSgcc(ctx, username, password, prevList, prevTs) {
+async function runSgcc(ctx, username, password) {
   const app = new SgApp(ctx, username, password);
-  const prevOf = (a) => (Array.isArray(prevList) ? prevList : []).find((x) => accKey(x) === a.consNo) || null;
   const s = await app.ensure();
   const accts = s.accounts || [];
   if (!accts.length) return [];
   // 账号下所有户号都查一遍（最多 6 个），显示哪个由 SGCC_ACCOUNT 在渲染时决定，改户号不用重新登录
-  // 失败的户号保留上次缓存并标记为旧数据，不再悄悄丢掉；一个户号都没拿到新数据才算这次刷新失败
   const out = [];
-  let fresh = 0, lastErr = null;
   for (const a of accts.slice(0, 6)) {
-    const prev = prevOf(a);
-    try { out.push(await queryAccount(app, a, prev, prevTs)); fresh++; }
-    catch (e) { lastErr = e; if (prev) out.push({ ...prev, _stale: true, _ts: prev._ts || prevTs }); }
+    try { out.push(await queryAccount(app, a)); } catch (e) { if (!out.length && a === accts[accts.length - 1]) throw e; }
   }
-  if (!fresh) throw lastErr || new Error('户号数据查询失败');
+  if (!out.length) throw new Error('户号数据查询失败');
   return out;
 }
 
@@ -639,8 +600,9 @@ function parse(acc) {
 function friendly(e) {
   const code = (e && e.code) || '';
   const msg = clean((e && e.message) || e).replace(/^Error:\s*/, '');
+  if (code === 'S1009' || /系统繁忙/.test(msg)) return '国网限流（S1009 系统繁忙），2 小时后自动重试';
   if (code === 'RK008') return '国网要求安全验证（RK008）：先在官方网上国网 App 登录一次，过几小时再刷新';
-  if (code === '0100') return '账号或密码错误（连错 5 次会锁 30 分钟），请检查模块里的账号密码';
+  if (code === '0100' || /密码错误/.test(msg)) return '账号或密码错误（连错 5 次会锁 30 分钟），请检查模块里的账号密码';
   return msg || '查询失败';
 }
 
@@ -659,27 +621,27 @@ async function getData(ctx, force) {
   let ttl = hours * 3600000;
   if (mine && mine.list && latestKey(mine.list) < ymdKey(-1) && new Date().getHours() >= 9) ttl = Math.min(ttl, 2 * 3600000);
   if (mine && mine.list && Date.now() - mine.ts < ttl && !force) return { configured: true, cache: mine };
-  // 失败退避：密码错误（0100）和新设备验证（4006）30 分钟内不重复登录（避免锁号），连强制刷新也拦；
-  // 其他错误只退避 5 分钟且不拦强制刷新。填了新验证码时 sig 变化，立即重试。登录被拒的退避在 SgApp 里单独处理
+  // 失败退避：同一账号密码失败后 30 分钟内不重复登录（避免触发锁号），填了新验证码时例外
   let err = null;
   try { err = ctx.storage.getJSON(KE); } catch (_) {}
   const sig = md5hex(username + '|' + password + '|' + clean(env.SGCC_SMS));
-  if (err && err.sig === sig && err.ts) {
-    const hard = ['0100', '4006'].includes(err.code);
-    if (Date.now() - err.ts < (hard ? 30 : 5) * 60000 && (hard || !force)) return { configured: true, cache: mine, error: err.msg };
-  }
+  if (err && err.sig === sig && Date.now() - err.ts < (err.wait || 30 * 60000)) return { configured: true, cache: mine, error: err.msg };
   let lock = 0;
   try { lock = Number(ctx.storage.get(KL) || 0); } catch (_) {}
   if (lock && Date.now() - lock < 90000) return { configured: true, cache: mine, busy: true, error: mine ? '' : '正在登录网上国网…' };
   try { ctx.storage.set(KL, String(Date.now())); } catch (_) {}
   try {
-    const list = await runSgcc(ctx, username, password, mine && mine.list, mine && mine.ts);
+    const list = await runSgcc(ctx, username, password);
     const next = { v: 3, ts: Date.now(), user: username, list };
     try { ctx.storage.setJSON(KD, next); ctx.storage.setJSON(KE, {}); } catch (_) {}
     return { configured: true, cache: next };
   } catch (e) {
     const msg = friendly(e);
-    try { ctx.storage.setJSON(KE, { sig, ts: Date.now(), msg, code: (e && e.code) || '' }); } catch (_) {}
+    // 限流类错误退避更久，避免越刷越被限：S1009 系统繁忙 2 小时
+    const code = (e && e.code) || '';
+    let wait = 30 * 60000;
+    if (code === 'S1009' || /系统繁忙/.test(String((e && e.message) || ''))) wait = 2 * 3600000;
+    try { ctx.storage.setJSON(KE, { sig, ts: Date.now(), msg, wait }); } catch (_) {}
     return { configured: true, cache: mine, error: msg };
   } finally {
     try { ctx.storage.set(KL, '0'); } catch (_) {}
@@ -794,15 +756,13 @@ function flexBars(vals, H, opts = {}) {
     else bar.backgroundGradient = { type: 'linear', colors: [hexA(top, fade), hexA(bottom, fade)], startPoint: { x: 0, y: 0 }, endPoint: { x: 0, y: 1 } };
     const kids = [spacer(), bar];
     if (labels) {
-      kids.push({ type: 'stack', height: 2, children: [] });
       let color = opts.weekend && opts.weekend[i] ? '#64D2FF99' : C.faint, weight = 'regular';
       if (hot) { color = hotC; weight = 'semibold'; }
       if (opts.strong && opts.strong[i]) { color = C.dim; weight = 'semibold'; }
       if (latest) { color = latestC; weight = 'bold'; }
       kids.push(T(labels[i], ls, color, weight, { minScale: 0.4 }));
     }
-    // 列内不用 gap（会在 spacer/柱/标签之间叠加），柱和标签之间固定 2pt，列高按实际内容算
-    return { type: 'stack', direction: 'column', alignItems: 'center', flex: 1, gap: 0, height: H + (labels ? 2 + Math.ceil(ls * 1.3) : 0), children: kids };
+    return { type: 'stack', direction: 'column', alignItems: 'center', flex: 1, gap: 2, height: H + (labels ? ls + 4 : 0), children: kids };
   });
   return row(cols, { gap, alignItems: 'end' });
 }
@@ -976,12 +936,12 @@ function buildLarge(p, r) {
         row([icon('chart.bar.xaxis', C.brand, 10), T(`近${list.length || 30}日用电`, 10, C.text, 'semibold'), T(rangeText(list), 8, C.faint), spacer(),
           T(`日均 ${fmt(avg)}`, 9, C.dim), legend(`峰值 ${fmt(peak)}`)], { gap: 4 }),
         spacer(),
-        (() => { const d = dayLabels(list); return flexBars(vals, 34, { labels: d.labels, weekend: d.weekend, strong: d.strong, size: 6 }); })(),
+        (() => { const d = dayLabels(list); return flexBars(vals, 46, { labels: d.labels, weekend: d.weekend, strong: d.strong, size: 6 }); })(),
       ], { gap: 4, padding: [8, 10], borderRadius: 14, flex: 1 }),
       glass([
         row([icon('calendar.badge.clock', '#BF5AF2', 10), T(`${new Date().getFullYear()} 年月度用电`, 10, C.text, 'semibold'), spacer(),
           T(mv.length ? `共 ${mv.length} 个月` : '暂无', 9, C.dim)], { gap: 4 }),
-        flexBars(mv, 28, { top: '#BF5AF2', bottom: '#5E5CE6', latest: '#DA8FFF', labels: mv.map((_, i) => `${i + 1}月`), size: 8 }),
+        flexBars(mv, 36, { top: '#BF5AF2', bottom: '#5E5CE6', latest: '#DA8FFF', labels: mv.map((_, i) => `${i + 1}月`), size: 8 }),
       ], { gap: 4, padding: [8, 10], borderRadius: 14 }),
       e || row([icon('building.2', C.faint, 9), T(p.org || '国家电网', 8, C.faint), spacer(), T(p.billDate ? `余额截至 ${p.billDate}` : '', 8, C.faint)], { gap: 3 }),
     ],
@@ -1030,11 +990,6 @@ export default async function (ctx) {
   const picked = pickAccount(r.cache.list, env.SGCC_ACCOUNT);
   const acc = picked.acc;
   if (!acc) return message('没有绑定户号', '请先在网上国网 App 里绑定用电户号。', r.cache.ts);
-  // 每个户号按自己的数据时间显示「更新于」，失败户号沿用缓存时不会被显示成最新
-  const r2 = acc._ts && acc._ts !== r.cache.ts ? { ...r, cache: { ...r.cache, ts: acc._ts } } : r;
-  return render(acc, picked, r2, env, family);
-}
-function render(acc, picked, r, env, family) {
   const p = parse(acc);
   p.miss = picked.miss;
   p.login = clean(env.SGCC_USERNAME).slice(-4);
