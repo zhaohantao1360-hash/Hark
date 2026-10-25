@@ -487,7 +487,209 @@ async function queryAccount(app, a) {
   };
 }
 
-async function runSgcc(ctx, username, password) {
+/* ==================== 网页通道（95598.cn） ====================
+ * App 接口被限流（S1009）时的备用路：走 www.95598.cn 网页接口，协议参考 tiejiang29/state_grid
+ * 的实测说明自行实现：f02 握手换 keyCode → f06 两步登录（先拿 RK1003，再带 complexSliderRet）
+ * → authorize + getWebToken 换 bearer（约 30 分钟）→ 业务接口。登录令牌约 15 天，存本地复用。
+ * RK001 是按登录标识计的日额度，被拒就冷却到当天结束。 */
+const W_BASE = 'https://www.95598.cn/api';
+const W_APPKEY = '0329843199564c55809c77959792b558';
+const W_SECRET = '4c1974786ee54d3bb4fb82c1ec5cd1a8';
+const W_PUB = '04461932EDC916BFEF2EA324056296214E8281FDF9F962C82E28D59C7B98BB5ED479801B8AB8F86E933B73A136A431D40E0FF769A7209E63E67C8B9326F277A058';
+const W_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+const W_AUTH_APIS = ['/osg-open-uc0001/member/c9/f02', '/osg-open-bc0001/member/c05/f01', '/osg-open-bc0001/member/c01/f02', '/osg-open-bc0001/member/c04/f03', '/osg-web0004/member/c24/f01'];
+const W_JSON = 'application/json;charset=UTF-8';
+const KW = 'sgcc_web_sess';
+
+function wSm4Enc(plain, keyText) {
+  const kb = utf8enc(keyText); const rk = sm4Key(kb.subarray(0, 16)); const iv = concat(kb.slice(0, 8), kb.slice(kb.length - 8));
+  const data = utf8enc(plain); const pad = 16 - (data.length % 16); const buf = new Uint8Array(data.length + pad); buf.set(data); buf.fill(pad, data.length);
+  const out = new Uint8Array(buf.length); let prev = iv;
+  for (let i = 0; i < buf.length; i += 16) { const blk = new Uint8Array(16); for (let j = 0; j < 16; j++) blk[j] = buf[i + j] ^ prev[j]; prev = sm4Block(rk, blk, true); out.set(prev, i); }
+  return b64(out);
+}
+function wSm4Dec(b64text, keyText) {
+  const kb = utf8enc(keyText); const rk = sm4Key(kb.subarray(0, 16)); let prev = concat(kb.slice(0, 8), kb.slice(kb.length - 8));
+  const data = b64dec(b64text); const out = new Uint8Array(data.length);
+  for (let i = 0; i < data.length; i += 16) { const blk = data.subarray(i, i + 16); const p = sm4Block(rk, blk, false); for (let j = 0; j < 16; j++) out[i + j] = p[j] ^ prev[j]; prev = blk; }
+  const pad = out[out.length - 1]; return utf8dec(out.slice(0, out.length - (pad > 0 && pad <= 16 ? pad : 0)));
+}
+function wSm2(keyText, pub) { return sm2EncryptKey(toHex(utf8enc(keyText)), pub); }
+function wSm3(s) { return toHex(sm3(utf8enc(s))); }
+function wBiz(p) { const d = p && p.data; if (d && typeof d === 'object') return d.bizrt && typeof d.bizrt === 'object' ? d.bizrt : d; return p || {}; }
+function wSrv(p) { const d = p && p.data; return d && typeof d === 'object' && d.srvrt && typeof d.srvrt === 'object' ? d.srvrt : {}; }
+function wDecrypt(p, key) {
+  if (!p || typeof p !== 'object') return {};
+  const blob = p.encryptData || (typeof p.data === 'string' ? p.data : '');
+  if (blob && key) { try { const o = JSON.parse(wSm4Dec(String(blob), key)); if (o && typeof o === 'object') return o; } catch (_) {} }
+  return p;
+}
+function wErr(p, fallback) {
+  const code = String((p && p.code) || ''); const srv = wSrv(p);
+  const msg = clean(srv.resultMessage || (p && p.message) || '');
+  if (code === '11401' || code === 'RK001' || /RK001/.test(msg)) return new SgError('RK001', '网页通道今日登录额度已用完（RK001）');
+  if (['RK007', 'RK008', 'RK1003'].includes(code)) return new SgError(code, '网页通道要求滑块验证（' + code + '）');
+  if (['0050', '0100', '0101'].includes(String(srv.resultCode || '')) || /密码/.test(msg)) return new SgError('0100', msg || '账号或密码错误');
+  if (!p || !Object.keys(p).length) return new SgError('net', fallback || '连不上 95598 网页接口');
+  return new SgError(String(srv.resultCode || code || 'web'), msg || fallback || '网页通道返回异常');
+}
+function cnEndOfDay() { const n = Date.now() + 8 * 3600000; return n - (n % 86400000) + 86400000 - 8 * 3600000 - 1000; }
+
+class SgWeb {
+  constructor(ctx, user, pass) {
+    this.ctx = ctx; this.user = user; this.digest = md5hex(pass).toUpperCase();
+    this.policy = clean((ctx.env || {}).SGCC_POLICY) || 'DIRECT';
+    this.key = uk(KW, user); this.s = {};
+    try { const o = ctx.storage.getJSON(this.key); if (o && o.user === user && o.digest === md5hex(this.digest)) this.s = o; } catch (_) {}
+  }
+  save() { try { this.ctx.storage.setJSON(this.key, { ...this.s, user: this.user, digest: md5hex(this.digest) }); } catch (_) {} }
+  async raw(path, body, headers) {
+    const h = { ...headers, 'User-Agent': W_UA };
+    const req = { headers: h, body: typeof body === 'string' ? body : JSON.stringify(body), timeout: 20000 };
+    if (this.policy) req.policy = this.policy;
+    let text = '';
+    try { const r = await this.ctx.http.post(W_BASE + path, req); text = await r.text(); } catch (e) { throw new SgError('net', '连不上 95598 网页接口：' + ((e && e.message) || e)); }
+    if (!/^\s*\{/.test(text)) return {};
+    try { const o = JSON.parse(text); return o && typeof o === 'object' ? o : {}; } catch (_) { return {}; }
+  }
+  baseHeaders(ts) { return { Accept: W_JSON, 'Content-Type': W_JSON, version: '1.0', source: '0901', timestamp: String(ts), wsgwType: 'web', appKey: W_APPKEY }; }
+  envelope(payload, ts, wrap) {
+    const at = this.s.access || '', tk = this.s.token || '';
+    const inner = wrap === false ? payload : { _access_token: at ? at.slice(Math.floor(at.length / 2)) : '', _t: tk ? tk.slice(Math.floor(tk.length / 2)) : '', _data: payload, _s: ts };
+    const ci = wSm4Enc(JSON.stringify(inner), this.s.keyCode);
+    return { data: ci + wSm3(ci + String(ts)), skey: wSm2(this.s.keyCode, this.s.pub || W_PUB), timestamp: String(ts) };
+  }
+  async post(path, payload, ts, wrap) {
+    ts = ts || Date.now();
+    const h = this.baseHeaders(ts); h.keyCode = this.s.keyCode;
+    if (W_AUTH_APIS.includes(path) && this.s.access) { const at = this.s.access, tk = this.s.token || ''; h.Authorization = 'Bearer ' + at.slice(0, Math.floor(at.length / 2)); h.t = tk.slice(0, Math.floor(tk.length / 2)); }
+    return wDecrypt(await this.raw(path, this.envelope(payload, ts, wrap), h), this.s.keyCode);
+  }
+  async handshake() {
+    const lk = randStr(32, '0123456789abcdef'); const ts = Date.now();
+    const ci = wSm4Enc(JSON.stringify({ client_id: W_APPKEY, client_secret: W_SECRET }), lk);
+    const p = await this.raw('/oauth2/outer/c02/f02', { data: ci + wSm3(ci + String(ts)), skey: wSm2(lk, W_PUB), client_id: W_APPKEY, timestamp: String(ts) }, this.baseHeaders(ts));
+    const plain = wDecrypt(p, lk); const biz = wBiz(plain);
+    if (!biz.keyCode) throw wErr(plain, '网页通道握手失败');
+    this.s.keyCode = String(biz.keyCode); this.s.pub = String(biz.publicKey || W_PUB);
+  }
+  loginBody(answer) {
+    const b = { params: { uscInfo: { devciceIp: '', tenant: 'state_grid', member: '0902', devciceId: '' }, quInfo: { optSys: 'android', pushId: '000000', addressProvince: '110100', password: this.digest, addressRegion: '110101', account: this.user, addressCity: '330100' } } };
+    if (answer) { b.complexSliderRet = 0; b.complexSliderType = 'clickImg'; }
+    return b;
+  }
+  async login() {
+    if (this.s.cooldown && Date.now() < this.s.cooldown) throw new SgError('RK001', '网页通道今日登录额度已用完（RK001），明天自动恢复');
+    this.s.access = ''; this.s.token = '';
+    await this.handshake();
+    const ts = Date.now();
+    let p = await this.post('/osg-web0004/open/c44/f06', this.loginBody(false), ts);
+    let biz = wBiz(p);
+    if (!biz.token) {
+      if (!['RK1003', 'RK007', 'RK008'].includes(String(p.code || ''))) { const e = wErr(p, '网页登录失败'); if (e.code === 'RK001') { this.s.cooldown = cnEndOfDay(); this.save(); } throw e; }
+      p = await this.post('/osg-web0004/open/c44/f06', this.loginBody(true), ts + 1);
+      biz = wBiz(p);
+    }
+    if (!biz.token) { const e = wErr(p, '网页登录失败'); if (e.code === 'RK001') { this.s.cooldown = cnEndOfDay(); this.save(); } throw e; }
+    this.s.token = String(biz.token);
+    const ui = Array.isArray(biz.userInfo) ? biz.userInfo[0] : biz.userInfo;
+    this.s.userInfo = ui && typeof ui === 'object' ? ui : {};
+    this.s.exp = Date.now() + 15 * 86400000; this.s.cooldown = 0;
+    this.save();
+  }
+  async bearer() {
+    if (this.s.access && Date.now() < (this.s.bearerExp || 0)) return true;
+    const ts = Date.now();
+    const form = `client_id=${W_APPKEY}&response_type=code&redirect_url=%2Ftest&timestamp=${ts}&rsi=${encodeURIComponent(this.s.token)}`;
+    const h = this.baseHeaders(ts); h['Content-Type'] = 'application/x-www-form-urlencoded';
+    const auth = wDecrypt(await this.raw('/oauth2/oauth/authorize', form, h), this.s.token);
+    const url = String(wBiz(auth).redirect_url || ''); const at = url.indexOf('code=');
+    if (at < 0) return false;
+    const tok = await this.post('/oauth2/outer/getWebToken', { grant_type: 'authorization_code', sign: wSm3(W_APPKEY + String(ts)), client_secret: W_SECRET, state: '464606a4-184c-4beb-b442-2ab7761d0796', key_code: this.s.keyCode, client_id: W_APPKEY, timestamp: ts, code: url.slice(at + 5, at + 37) }, ts, false);
+    const biz = wBiz(tok);
+    if (!biz.access_token) return false;
+    this.s.access = String(biz.access_token);
+    this.s.bearerExp = Date.now() + Math.max(60, (Number(biz.expiresIn) || 1800) - 300) * 1000;
+    this.save();
+    return true;
+  }
+  async ensure() {
+    if (this.s.token && this.s.keyCode && (this.s.exp || 0) > Date.now() + 86400000) { if (await this.bearer()) return; }
+    await this.login();
+    if (!(await this.bearer())) throw new SgError('web', '网页通道换取访问令牌失败');
+  }
+  async call(path, payload) {
+    let p = await this.post(path, payload);
+    const dead = (x) => ['-200', '-201'].includes(String(x.code || '')) || /登录状态已失效/.test(String(wSrv(x).resultMessage || x.message || ''));
+    if (dead(p)) { await this.login(); if (!(await this.bearer())) throw new SgError('web', '网页通道换取访问令牌失败'); p = await this.post(path, payload); }
+    const code = String(p.code == null ? '' : p.code);
+    if (!['1', '0000', '000000'].includes(code)) throw wErr(p, '网页接口返回异常');
+    const srv = wSrv(p); if (srv.resultCode && !['0000', '0'].includes(String(srv.resultCode))) throw wErr(p, '网页接口返回异常');
+    return p.data && typeof p.data === 'object' ? p.data : {};
+  }
+}
+
+const W_USC = () => ({ member: '0902', devciceIp: '', devciceId: '', tenant: 'state_grid' });
+const W_SVC = { order: '0101154', uploadPic: '0101296', pauseSCode: '0101250', pauseTCode: '0101251', listconsumers: '0101093', messageList: '0101343', submit: '0101003', sbcMsg: '0101210', powercut: '0104514', BkAuth01: 'f15', BkAuth02: 'f18', BkAuth03: 'f02', BkAuth04: 'f17', BkAuth05: 'f05', BkAuth06: 'f16', BkAuth07: 'f01', BkAuth08: 'f03' };
+
+// 余额响应 → 兼容层 eleBill（App 和网页通道共用）
+function billFromBal(bal) {
+  let sumMoney = NaN, owe = 0;
+  if (bal) {
+    const sm = num(bal.sumMoney), ab = num(bal.accountBalance), pb = num(bal.prepayBal);
+    if (String(bal.consType) === '1') sumMoney = Number.isFinite(sm) ? sm : pb;
+    else if (sm > 0) { sumMoney = -sm; owe = sm; }
+    else sumMoney = ab > 0 ? ab : pb > 0 ? pb : (Number.isFinite(sm) ? 0 : NaN);
+    if (num(bal.historyOwe) > 0) owe = num(bal.historyOwe);
+  }
+  return { sumMoney, historyOwe: owe, prepayBal: bal ? num(bal.prepayBal) : NaN, date: bal ? clean(bal.date || bal.amtTime) : '' };
+}
+
+async function runSgccWeb(ctx, username, password) {
+  const w = new SgWeb(ctx, username, password);
+  try { await w.ensure(); } catch (e) { e.stage = '网页登录'; throw e; }
+  const ui = w.s.userInfo || {}; const uid = String(ui.userId || '');
+  const uname = clean(ui.loginAccount || ui.nickname || '');
+  const d0 = await w.call('/osg-open-uc0001/member/c9/f02', { serviceCode: '01010049', source: '0902', target: '-1', uscInfo: W_USC(), quInfo: { userId: uid }, token: w.s.token });
+  const users = (Array.isArray(d0.bizrt && d0.bizrt.powerUserList) ? d0.bizrt.powerUserList : []).filter((x) => x && x.elecTypeCode !== '05');
+  const out = [];
+  const n = cnNow();
+  const fmtD = (t) => { const d = new Date(t + 8 * 3600000); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`; };
+  const endD = fmtD(Date.now() - 86400000), startD = fmtD(Date.now() - 41 * 86400000);
+  for (const a of users.slice(0, 6)) {
+    const pro = clean(a.proNo || a.provinceId), src = clean(a.consNo_dst || a.consNo);
+    let bal = null, daily = [], bills = [], info = {}, firstErr = null;
+    try {
+      const d = await w.call('/osg-open-bc0001/member/c05/f01', { data: { srvCode: '', serialNo: '', channelCode: '0902', funcCode: 'WEBA1007200', acctId: uid, userName: uname, promotType: '1', promotCode: '1', userAccountId: uid, list: [{ consNoSrc: src, proCode: pro, sceneType: a.consSortCode || a.elecTypeCode, consNo: a.consNo, orgNo: a.orgNo }] }, serviceCode: '0101143', source: 'SGAPP', target: pro });
+      bal = (Array.isArray(d.list) ? d.list : []).find((x) => x && typeof x === 'object') || null;
+    } catch (e) { firstErr = firstErr || e; }
+    try {
+      const d = await w.call('/osg-web0004/member/c24/f01', { params1: { serviceCode: W_SVC, source: 'SGAPP', target: '32101', uscInfo: W_USC(), quInfo: { userId: uid }, token: w.s.token }, params3: { data: { acctId: uid, consNo: src, consType: '01', endTime: endD, orgNo: a.orgNo, queryYear: String(n.y), proCode: pro, serialNo: '', srvCode: '', startTime: startD, userName: uname, funcCode: 'WEBALIPAY_01', channelCode: '0902', clearCache: '11', promotCode: '1', promotType: '1' }, serviceCode: 'BCP_000026', source: 'app', target: pro }, params4: '010103' });
+      (Array.isArray(d.sevenEleList) ? d.sevenEleList : []).forEach((x) => daily.push({ day: x.day, dayElePq: x.dayElePq }));
+    } catch (e) { firstErr = firstErr || e; }
+    for (const y of n.m === 1 ? [n.y, n.y - 1] : [n.y]) {
+      try {
+        const d = await w.call('/osg-open-bc0001/member/c01/f02', { data: { acctId: uid, channelCode: '0902', clearCache: '11', consType: a.constType, funcCode: 'ALIPAY_01', orgNo: a.orgNo, proCode: pro, promotCode: '1', promotType: '1', serialNo: '', srvCode: '', userName: '', provinceCode: pro, userAccountId: uid, consNo: src, queryYear: String(y) }, serviceCode: 'BCP_000026', source: 'app', target: pro });
+        const list = (Array.isArray(d.mothEleList) ? d.mothEleList : []).map((x) => ({ month: clean(x.month).replace(/\D/g, '').slice(0, 6), monthEleNum: num(x.monthEleNum), monthEleCost: num(x.monthEleCost) })).filter((x) => x.month.length === 6);
+        bills = list.concat(bills);
+        if (y === n.y && d.dataInfo) info = { totalEleNum: num(d.dataInfo.totalEleNum), totalEleCost: num(d.dataInfo.totalEleCost) };
+      } catch (e) { firstErr = firstErr || e; }
+    }
+    if (!bal && !daily.length && !bills.length) { if (firstErr) throw firstErr; continue; }
+    out.push({
+      userInfo: { consNo: a.consNo, consNo_dst: src, consName_dst: clean(a.consName_dst || a.consName), orgName: clean(a.orgName), proNo: pro },
+      eleBill: billFromBal(bal),
+      dayElecQuantity31: { sevenEleList: daily },
+      monthElecQuantity: { mothEleList: bills, dataInfo: info },
+      monthTotal: NaN,
+      via: 'web',
+    });
+  }
+  if (!out.length) throw new SgError('web', '网页通道没查到户号数据');
+  return out;
+}
+
+async function runSgccApp(ctx, username, password) {
   const app = new SgApp(ctx, username, password);
   let s;
   try { s = await app.ensure(); } catch (e) { e.stage = '登录'; throw e; }
@@ -500,6 +702,32 @@ async function runSgcc(ctx, username, password) {
   }
   if (!out.length) throw new Error('户号数据查询失败');
   return out;
+}
+
+// 取数通道：auto（默认）= 先走 App 接口，被限流/失败或日用电缺失时自动改走 95598 网页接口；app / web = 只走一条
+// App 被限流后 12 小时内直接走网页，不再去撞 App（越撞越难解封）
+async function runSgcc(ctx, username, password) {
+  const mode = clean((ctx.env || {}).SGCC_CHANNEL).toLowerCase() || 'auto';
+  if (mode === 'web') return runSgccWeb(ctx, username, password);
+  if (mode === 'app') return runSgccApp(ctx, username, password);
+  const KB = uk('sgcc_app_busy', username);
+  let busyUntil = 0;
+  try { busyUntil = Number(ctx.storage.get(KB) || 0); } catch (_) {}
+  const markBusy = () => { try { ctx.storage.set(KB, String(Date.now() + 12 * 3600000)); } catch (_) {} };
+  let webErr = null;
+  if (busyUntil > Date.now()) {
+    try { return await runSgccWeb(ctx, username, password); } catch (we) { webErr = we; }
+  }
+  let list = null, appErr = null;
+  try { list = await runSgccApp(ctx, username, password); } catch (e) { appErr = e; }
+  if (list && !list.some((x) => x.warn)) { try { ctx.storage.set(KB, '0'); } catch (_) {} return list; }
+  if (isBusy(appErr) || (list && list.some((x) => x.warn))) markBusy();
+  // App 账号密码错就别再撞网页（同一套账号密码，只会多记一次错误）
+  if (appErr && (appErr.code === '0100' || /密码错误/.test(String(appErr.message || '')))) throw appErr;
+  if (!webErr) { try { return await runSgccWeb(ctx, username, password); } catch (we) { webErr = we; } }
+  if (list) return list;
+  appErr.webMsg = friendly(webErr).replace(/^网页通道/, '');
+  throw appErr;
 }
 
 /* ==================== 解析 ==================== */
@@ -606,10 +834,12 @@ function parse(acc) {
 function friendly(e) {
   const code = (e && e.code) || '';
   const msg = clean((e && e.message) || e).replace(/^Error:\s*/, '');
-  if (isBusy(e)) return `国网限流（S1009${e.stage ? '，卡在' + e.stage : ''}）`;
+  const tail = e && e.webMsg ? `；网页通道：${e.webMsg}` : '';
+  if (isBusy(e)) return `国网限流（S1009${e.stage ? '，卡在' + e.stage : ''}）${tail}`;
+  if (code === 'RK001' && e.stage === '网页登录') return '网页通道今日登录额度已用完（RK001），明天自动恢复';
   if (code === 'RK008') return '国网要求安全验证（RK008）：先在官方网上国网 App 登录一次，过几小时再刷新';
   if (code === '0100' || /密码错误/.test(msg)) return '账号或密码错误（连错 5 次会锁 30 分钟），请检查模块里的账号密码';
-  return msg || '查询失败';
+  return (msg || '查询失败') + tail;
 }
 
 async function getData(ctx, force) {
