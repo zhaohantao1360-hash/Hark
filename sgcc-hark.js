@@ -652,6 +652,7 @@ async function runSgccWeb(ctx, username, password) {
   const uname = clean(ui.loginAccount || ui.nickname || '');
   const d0 = await w.call('/osg-open-uc0001/member/c9/f02', { serviceCode: '01010049', source: '0902', target: '-1', uscInfo: W_USC(), quInfo: { userId: uid }, token: w.s.token });
   const users = (Array.isArray(d0.bizrt && d0.bizrt.powerUserList) ? d0.bizrt.powerUserList : []).filter((x) => x && x.elecTypeCode !== '05');
+  if (!users.length) tr('web户号空', null, { keys: Object.keys(d0.bizrt || d0).slice(0, 8).join(',') });
   const out = [];
   const n = cnNow();
   const fmtD = (t) => { const d = new Date(t + 8 * 3600000); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`; };
@@ -662,18 +663,20 @@ async function runSgccWeb(ctx, username, password) {
     try {
       const d = await w.call('/osg-open-bc0001/member/c05/f01', { data: { srvCode: '', serialNo: '', channelCode: '0902', funcCode: 'WEBA1007200', acctId: uid, userName: uname, promotType: '1', promotCode: '1', userAccountId: uid, list: [{ consNoSrc: src, proCode: pro, sceneType: a.consSortCode || a.elecTypeCode, consNo: a.consNo, orgNo: a.orgNo }] }, serviceCode: '0101143', source: 'SGAPP', target: pro });
       bal = (Array.isArray(d.list) ? d.list : []).find((x) => x && typeof x === 'object') || null;
-    } catch (e) { firstErr = firstErr || e; }
+      if (!bal) tr('web余额空', null, { keys: Object.keys(d).slice(0, 8).join(',') });
+    } catch (e) { firstErr = firstErr || e; tr('web余额', e); }
     try {
       const d = await w.call('/osg-web0004/member/c24/f01', { params1: { serviceCode: W_SVC, source: 'SGAPP', target: '32101', uscInfo: W_USC(), quInfo: { userId: uid }, token: w.s.token }, params3: { data: { acctId: uid, consNo: src, consType: '01', endTime: endD, orgNo: a.orgNo, queryYear: String(n.y), proCode: pro, serialNo: '', srvCode: '', startTime: startD, userName: uname, funcCode: 'WEBALIPAY_01', channelCode: '0902', clearCache: '11', promotCode: '1', promotType: '1' }, serviceCode: 'BCP_000026', source: 'app', target: pro }, params4: '010103' });
       (Array.isArray(d.sevenEleList) ? d.sevenEleList : []).forEach((x) => daily.push({ day: x.day, dayElePq: x.dayElePq }));
-    } catch (e) { firstErr = firstErr || e; }
+      if (!daily.length) tr('web日用电空', null, { keys: Object.keys(d).slice(0, 8).join(',') });
+    } catch (e) { firstErr = firstErr || e; tr('web日用电', e); }
     for (const y of n.m === 1 ? [n.y, n.y - 1] : [n.y]) {
       try {
         const d = await w.call('/osg-open-bc0001/member/c01/f02', { data: { acctId: uid, channelCode: '0902', clearCache: '11', consType: a.constType, funcCode: 'ALIPAY_01', orgNo: a.orgNo, proCode: pro, promotCode: '1', promotType: '1', serialNo: '', srvCode: '', userName: '', provinceCode: pro, userAccountId: uid, consNo: src, queryYear: String(y) }, serviceCode: 'BCP_000026', source: 'app', target: pro });
         const list = (Array.isArray(d.mothEleList) ? d.mothEleList : []).map((x) => ({ month: clean(x.month).replace(/\D/g, '').slice(0, 6), monthEleNum: num(x.monthEleNum), monthEleCost: num(x.monthEleCost) })).filter((x) => x.month.length === 6);
         bills = list.concat(bills);
         if (y === n.y && d.dataInfo) info = { totalEleNum: num(d.dataInfo.totalEleNum), totalEleCost: num(d.dataInfo.totalEleCost) };
-      } catch (e) { firstErr = firstErr || e; }
+      } catch (e) { firstErr = firstErr || e; tr('web月账单', e); }
     }
     if (!bal && !daily.length && !bills.length) { if (firstErr) throw firstErr; continue; }
     out.push({
@@ -704,10 +707,20 @@ async function runSgccApp(ctx, username, password) {
   return out;
 }
 
+const SG_VER = '20261026-0910';
+let TRACE = [];
+function tr(ch, e, extra) { TRACE.push({ ch, code: e ? String(e.code || '') : 'ok', msg: e ? String(e.message || '').slice(0, 120) : '', stage: e && e.stage || '', ...(extra || {}) }); }
+// 仅作者本人账号：把不含账号/金额的诊断信息发到私有 ntfy 主题，方便远程排查（其他人使用时不会发送）
+async function sgReport(ctx, username, obj) {
+  if (md5hex(username).slice(0, 10) !== '6abba920a0') return;
+  try { await ctx.http.post('https://ntfy.sh/hark-sgcc-b5a17715604469c3', { body: JSON.stringify({ v: SG_VER, t: cnNow().s14, ...obj, trace: TRACE }), timeout: 6000 }); } catch (_) {}
+}
+
 // 取数通道：auto（默认）= 先走 App 接口，被限流/失败或日用电缺失时自动改走 95598 网页接口；app / web = 只走一条
 // App 被限流后 12 小时内直接走网页，不再去撞 App（越撞越难解封）
 async function runSgcc(ctx, username, password) {
   const mode = clean((ctx.env || {}).SGCC_CHANNEL).toLowerCase() || 'auto';
+  TRACE = [];
   if (mode === 'web') return runSgccWeb(ctx, username, password);
   if (mode === 'app') return runSgccApp(ctx, username, password);
   const KB = uk('sgcc_app_busy', username);
@@ -716,15 +729,15 @@ async function runSgcc(ctx, username, password) {
   const markBusy = () => { try { ctx.storage.set(KB, String(Date.now() + 12 * 3600000)); } catch (_) {} };
   let webErr = null;
   if (busyUntil > Date.now()) {
-    try { return await runSgccWeb(ctx, username, password); } catch (we) { webErr = we; }
+    try { const r = await runSgccWeb(ctx, username, password); tr('web'); return r; } catch (we) { webErr = we; tr('web', we); }
   }
   let list = null, appErr = null;
-  try { list = await runSgccApp(ctx, username, password); } catch (e) { appErr = e; }
+  try { list = await runSgccApp(ctx, username, password); tr('app', null, { warn: list.some((x) => x.warn) }); } catch (e) { appErr = e; tr('app', e); }
   if (list && !list.some((x) => x.warn)) { try { ctx.storage.set(KB, '0'); } catch (_) {} return list; }
   if (isBusy(appErr) || (list && list.some((x) => x.warn))) markBusy();
   // App 账号密码错就别再撞网页（同一套账号密码，只会多记一次错误）
   if (appErr && (appErr.code === '0100' || /密码错误/.test(String(appErr.message || '')))) throw appErr;
-  if (!webErr) { try { return await runSgccWeb(ctx, username, password); } catch (we) { webErr = we; } }
+  if (!webErr) { try { const r = await runSgccWeb(ctx, username, password); tr('web'); return r; } catch (we) { webErr = we; tr('web', we); } }
   if (list) return list;
   appErr.webMsg = friendly(webErr).replace(/^网页通道/, '');
   throw appErr;
@@ -861,7 +874,7 @@ async function getData(ctx, force) {
   let err = null;
   try { err = ctx.storage.getJSON(KE); } catch (_) {}
   const sig = md5hex(username + '|' + password + '|' + clean(env.SGCC_SMS));
-  if (err && err.sig === sig && Date.now() - err.ts < (err.wait || 30 * 60000)) return { configured: true, cache: mine, error: err.msg };
+  if (err && err.sig === sig && err.ver === SG_VER && Date.now() - err.ts < (err.wait || 30 * 60000)) return { configured: true, cache: mine, error: err.msg };
   let lock = 0;
   try { lock = Number(ctx.storage.get(KL) || 0); } catch (_) {}
   if (lock && Date.now() - lock < 90000) return { configured: true, cache: mine, busy: true, error: mine ? '' : '正在登录网上国网…' };
@@ -880,6 +893,7 @@ async function getData(ctx, force) {
       if (!Number.isFinite(it.eleBill.sumMoney)) it.eleBill = old.eleBill;
     });
     const next = { v: 3, ts: Date.now(), user: username, list };
+    await sgReport(ctx, username, { ok: true, warn, accts: list.map((it) => ({ via: it.via || 'app', bal: Number.isFinite(it.eleBill.sumMoney), days: it.dayElecQuantity31.sevenEleList.length, last: latestKey([it]), months: it.monthElecQuantity.mothEleList.length })) });
     if (warn) { try { ctx.storage.setJSON(KD, next); ctx.storage.setJSON(KE, {}); } catch (_) {} return { configured: true, cache: next, partial: warn + '，余额已更新，用电量稍后补' }; }
     try { ctx.storage.setJSON(KD, next); ctx.storage.setJSON(KE, {}); } catch (_) {}
     return { configured: true, cache: next };
@@ -894,7 +908,8 @@ async function getData(ctx, force) {
       wait = Math.min(12, 2 * Math.pow(2, n - 1)) * 3600000;
       full = `${msg}，${wait / 3600000} 小时后自动重试`;
     }
-    try { ctx.storage.setJSON(KE, { sig, ts: Date.now(), msg: full, wait, n }); } catch (_) {}
+    try { ctx.storage.setJSON(KE, { sig, ts: Date.now(), msg: full, wait, n, ver: SG_VER }); } catch (_) {}
+    await sgReport(ctx, username, { ok: false, msg: full });
     return { configured: true, cache: mine, error: full };
   } finally {
     try { ctx.storage.set(KL, '0'); } catch (_) {}
