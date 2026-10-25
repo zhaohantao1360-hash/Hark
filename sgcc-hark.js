@@ -600,7 +600,7 @@ function parse(acc) {
 function friendly(e) {
   const code = (e && e.code) || '';
   const msg = clean((e && e.message) || e).replace(/^Error:\s*/, '');
-  if (code === 'S1009' || /系统繁忙/.test(msg)) return '国网限流（S1009 系统繁忙），2 小时后自动重试';
+  if (code === 'S1009' || /S1009|系统(正|繁)忙/.test(msg)) return '国网限流（S1009 系统繁忙），2 小时后自动重试';
   if (code === 'RK008') return '国网要求安全验证（RK008）：先在官方网上国网 App 登录一次，过几小时再刷新';
   if (code === '0100' || /密码错误/.test(msg)) return '账号或密码错误（连错 5 次会锁 30 分钟），请检查模块里的账号密码';
   return msg || '查询失败';
@@ -640,7 +640,7 @@ async function getData(ctx, force) {
     // 限流类错误退避更久，避免越刷越被限：S1009 系统繁忙 2 小时
     const code = (e && e.code) || '';
     let wait = 30 * 60000;
-    if (code === 'S1009' || /系统繁忙/.test(String((e && e.message) || ''))) wait = 2 * 3600000;
+    if (code === 'S1009' || /S1009|系统(正|繁)忙/.test(String((e && e.message) || ''))) wait = 2 * 3600000;
     try { ctx.storage.setJSON(KE, { sig, ts: Date.now(), msg, wait }); } catch (_) {}
     return { configured: true, cache: mine, error: msg };
   } finally {
