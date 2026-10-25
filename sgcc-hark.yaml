@@ -1,5 +1,5 @@
 name: 网上国网（Hark 液态玻璃版）
-description: 国家电网电费余额、昨日/本月/上月用电、近 30 日与月度柱状图；支持小/中/大号与锁屏。直连网上国网 App 接口，不经第三方网关；填写账号密码即可，每 6 小时自动更新
+description: 国家电网电费余额、昨日/本月/上月用电、近 30 日与月度柱状图；支持小/中/大号与锁屏。直连网上国网 App 接口，限流时自动改走 95598 网页接口，不经第三方网关；填写账号密码即可，每 6 小时自动更新
 author: Hark（版式参考 jadkg 南方电网小组件；App 协议移植自 stevenjoezhang/hass-state-grid，MIT）
 icon: https://is1-ssl.mzstatic.com/image/thumb/Purple116/v4/83/d8/8a/83d88a92-5a4d-7a2f-118c-80d795e7a9f6/AppIcon-0-0-1x_U007emarketing-0-5-0-0-sRGB-85-220.png/144x144.png
 env_schema:
@@ -27,6 +27,14 @@ env_schema:
     name: 国网请求策略
     description: 国网接口默认直连；直连不通再填国内节点或策略组名
     default_value: DIRECT
+  SGCC_CHANNEL:
+    name: 取数通道
+    description: auto=先走 App 接口，被限流（S1009）自动改走 95598 网页接口；app=只走 App；web=只走网页
+    default_value: auto
+    options:
+      - auto
+      - app
+      - web
   SGCC_REFRESH:
     name: 刷新间隔（小时）
     description: 电量数据每天更新一次，间隔太短容易触发风控
@@ -39,13 +47,13 @@ env_schema:
 scriptings:
 - generic:
     name: sgcc-hark
-    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/sgcc-hark.js?v=20261026-0745
-    timeout: 60
+    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/sgcc-hark.js?v=20261026-0900
+    timeout: 90
 - schedule:
     name: 网上国网定时更新
     cron: '17 */6 * * *'
-    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/sgcc-hark.js?v=20261026-0745
-    timeout: 60
+    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/sgcc-hark.js?v=20261026-0900
+    timeout: 90
     env:
       SGCC_SCHEDULE: 'true'
 widgets:
