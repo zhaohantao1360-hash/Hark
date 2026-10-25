@@ -214,6 +214,14 @@ async function fetchSubscription(ctx, url, customUA) {
     } catch {
       bodyText = '';
     }
+    const status = Number(response?.status || 0);
+    if (!headerData && (status >= 400 || /访问被拒绝|IP\s*未授权|信任\s*IP/.test(bodyText))) {
+      const m = bodyText.match(/当前\s*IP[：:]\s*(?:<[^>]+>\s*)*([0-9a-fA-F.:]+)/);
+      denied = /IP\s*未授权|信任\s*IP/.test(bodyText)
+        ? `机场拒绝：当前 IP${m ? ' ' + m[1] : ''} 未授权，去机场用户中心添加信任 IP`
+        : `机场拒绝访问（HTTP ${status}），检查订阅链接是否失效`;
+      return { traffic: null, nodeCount: 0 };
+    }
     return {
       traffic: headerData || parseBodyInfo(bodyText),
       nodeCount: countNodes(bodyText)
@@ -221,6 +229,7 @@ async function fetchSubscription(ctx, url, customUA) {
   };
 
   let bestNodeCount = 0;
+  let denied = '';
   let succeeded = false;
   let foundTraffic = null;
 
@@ -261,6 +270,7 @@ async function fetchSubscription(ctx, url, customUA) {
   }
 
   if (!succeeded) throw new Error('订阅请求失败，请检查链接或网络');
+  if (!foundTraffic && !bestNodeCount && denied) throw new Error(denied);
   return { traffic: foundTraffic, nodeCount: bestNodeCount };
 }
 
@@ -340,6 +350,8 @@ async function loadOne(ctx, sub) {
     try { prev = ctx.storage?.getJSON(key); } catch {}
     // 本次没数到节点时沿用上次成功数到的节点数
     if (!(fetched.nodeCount > 0) && prev?.nodeCount > 0) fetched.nodeCount = prev.nodeCount;
+    // 上次有流量、这次没拿到：别用「仅节点」覆盖，走缓存并提示
+    if (!fetched.traffic && prev?.traffic) throw new Error('本次机场未返回用量，显示上次数据');
     if (fetched.traffic) {
       const result = { mode: 'live', traffic: applyPlanTotal(sub, fetched.traffic), nodeCount: fetched.nodeCount, updatedAt: Date.now() };
       ctx.storage?.setJSON(key, result);
