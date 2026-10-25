@@ -268,6 +268,7 @@ const P_MONTH = 'emss-bia-bill-front/member/c51/f04';
 const P_BAL = 'emss-bia-balance-front/member/c16/f01';
 const CHECK_KEY = 'LNPO+ISJ+QeqNemFK+3OMUdexSn2i6pB';
 
+function isBusy(e) { return !!e && (e.code === 'S1009' || /S1009|系统(正|繁)忙/.test(String(e.message || ''))); }
 class SgError extends Error { constructor(code, msg) { super(msg ? `${msg}` : code); this.code = String(code || ''); } }
 
 function cnNow() { const d = new Date(Date.now() + 8 * 3600000); const p = (n, l = 2) => String(n).padStart(l, '0'); return { s14: `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}`, ms: p(d.getUTCMilliseconds(), 3), y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate() }; }
@@ -431,7 +432,7 @@ function monthRange(y, m) { return [ymd(y, m, 1), ymd(y, m, new Date(Date.UTC(y,
 async function queryAccount(app, a) {
   const n = cnNow();
   const daily = [];
-  let monthTotal = NaN;
+  let monthTotal = NaN, dailyErr = null;
   for (let off = 0; off < 2; off++) {
     let y = n.y, m = n.m - off; if (m < 1) { m += 12; y -= 1; }
     const [s, e] = monthRange(y, m);
@@ -439,7 +440,9 @@ async function queryAccount(app, a) {
       const d = await app.authed(P_DAILY, { serviceCode: 'BCP_000026', source: 'app', target: a.pro, data: { acctId: 'acctid01', channelCode: 'SGAPP', consNo: a.src, consNosrc: a.src, endTime: e, consType: consType(a), funcCode: 'ALIPAY_01', orgNo: a.org, proCode: a.pro, promotCode: '1', promotType: '1', serialNo: '', srvCode: '', startTime: s, userName: 'acctid01' } });
       (Array.isArray(d.sevenEleList) ? d.sevenEleList : []).forEach((x) => daily.push({ day: x.day, dayElePq: x.dayElePq }));
       if (off === 0) monthTotal = num(d.totalPq);
-    } catch (e) { if (off === 0 && !daily.length) throw e; }
+    } catch (e) {
+      if (off === 0 && !daily.length) { e.stage = '日用电'; if (!isBusy(e)) throw e; dailyErr = e; break; }
+    }
   }
   let bills = [], yearPq = NaN, yearAmt = NaN;
   for (const y of [n.y, n.y - 1]) {
@@ -464,6 +467,7 @@ async function queryAccount(app, a) {
     const d = await app.authed(P_BAL, { serviceCode: '0101143', source: 'app', target: a.pro, data: { srvCode: '', serialNo: '', channelCode: '0902', funcCode: 'A1007200', acctId: app.sess.userId, userName: 'acctid01', promotType: '1', promotCode: '1', userAccountId: app.sess.userId, list: [{ consNoSrc: a.src, proCode: a.pro, sceneType: a.elec, consNo: a.consNo, orgNo: a.org }] } });
     bal = (Array.isArray(d.list) ? d.list : []).find((x) => x && typeof x === 'object') || null;
   } catch (e) { if (['-200', '-201', '4006', 'RK008'].includes(e.code)) throw e; }
+  if (dailyErr && !bal && !bills.length) throw dailyErr;
   // 转成和原兼容层一致的结构，界面层不用改
   let sumMoney = NaN, owe = 0;
   if (bal) {
@@ -479,12 +483,14 @@ async function queryAccount(app, a) {
     dayElecQuantity31: { sevenEleList: daily },
     monthElecQuantity: { mothEleList: bills, dataInfo: { totalEleNum: yearPq, totalEleCost: yearAmt } },
     monthTotal,
+    warn: dailyErr ? friendly(dailyErr) : '',
   };
 }
 
 async function runSgcc(ctx, username, password) {
   const app = new SgApp(ctx, username, password);
-  const s = await app.ensure();
+  let s;
+  try { s = await app.ensure(); } catch (e) { e.stage = '登录'; throw e; }
   const accts = s.accounts || [];
   if (!accts.length) return [];
   // 账号下所有户号都查一遍（最多 6 个），显示哪个由 SGCC_ACCOUNT 在渲染时决定，改户号不用重新登录
@@ -600,7 +606,7 @@ function parse(acc) {
 function friendly(e) {
   const code = (e && e.code) || '';
   const msg = clean((e && e.message) || e).replace(/^Error:\s*/, '');
-  if (code === 'S1009' || /S1009|系统(正|繁)忙/.test(msg)) return '国网限流（S1009 系统繁忙），2 小时后自动重试';
+  if (isBusy(e)) return `国网限流（S1009${e.stage ? '，卡在' + e.stage : ''}）`;
   if (code === 'RK008') return '国网要求安全验证（RK008）：先在官方网上国网 App 登录一次，过几小时再刷新';
   if (code === '0100' || /密码错误/.test(msg)) return '账号或密码错误（连错 5 次会锁 30 分钟），请检查模块里的账号密码';
   return msg || '查询失败';
@@ -632,17 +638,34 @@ async function getData(ctx, force) {
   try { ctx.storage.set(KL, String(Date.now())); } catch (_) {}
   try {
     const list = await runSgcc(ctx, username, password);
+    // 日用电被限流时沿用旧缓存里的日用电/月账单，只更新拿到的部分
+    let warn = '';
+    list.forEach((it) => {
+      if (!it.warn) return;
+      warn = it.warn;
+      const old = mine && mine.list && mine.list.find((o) => o.userInfo && o.userInfo.consNo === it.userInfo.consNo);
+      if (!old) return;
+      if (!it.dayElecQuantity31.sevenEleList.length) { it.dayElecQuantity31 = old.dayElecQuantity31; if (!Number.isFinite(it.monthTotal)) it.monthTotal = old.monthTotal; }
+      if (!it.monthElecQuantity.mothEleList.length) it.monthElecQuantity = old.monthElecQuantity;
+      if (!Number.isFinite(it.eleBill.sumMoney)) it.eleBill = old.eleBill;
+    });
     const next = { v: 3, ts: Date.now(), user: username, list };
+    if (warn) { try { ctx.storage.setJSON(KD, next); ctx.storage.setJSON(KE, {}); } catch (_) {} return { configured: true, cache: next, partial: warn + '，余额已更新，用电量稍后补' }; }
     try { ctx.storage.setJSON(KD, next); ctx.storage.setJSON(KE, {}); } catch (_) {}
     return { configured: true, cache: next };
   } catch (e) {
     const msg = friendly(e);
     // 限流类错误退避更久，避免越刷越被限：S1009 系统繁忙 2 小时
     const code = (e && e.code) || '';
-    let wait = 30 * 60000;
-    if (code === 'S1009' || /S1009|系统(正|繁)忙/.test(String((e && e.message) || ''))) wait = 2 * 3600000;
-    try { ctx.storage.setJSON(KE, { sig, ts: Date.now(), msg, wait }); } catch (_) {}
-    return { configured: true, cache: mine, error: msg };
+    let wait = 30 * 60000, n = 0, full = msg;
+    if (isBusy(e)) {
+      // 连续限流逐次加长：2h → 4h → 8h → 12h，越刷越不容易解封
+      n = (err && err.sig === sig && err.n) ? err.n + 1 : 1;
+      wait = Math.min(12, 2 * Math.pow(2, n - 1)) * 3600000;
+      full = `${msg}，${wait / 3600000} 小时后自动重试`;
+    }
+    try { ctx.storage.setJSON(KE, { sig, ts: Date.now(), msg: full, wait, n }); } catch (_) {}
+    return { configured: true, cache: mine, error: full };
   } finally {
     try { ctx.storage.set(KL, '0'); } catch (_) {}
   }
@@ -854,8 +877,9 @@ function message(title, body, ts) {
 }
 
 function errLine(r) {
-  if (!r.error && !r.busy) return null;
-  return row([icon('exclamationmark.circle.fill', C.warn, 9), T(r.busy ? '正在更新…' : `更新失败，显示缓存：${r.error}`, 8, C.warn)], { gap: 3 });
+  if (!r.error && !r.busy && !r.partial) return null;
+  const t = r.busy ? '正在更新…' : r.error ? `更新失败，显示缓存：${r.error}` : r.partial;
+  return row([icon('exclamationmark.circle.fill', C.warn, 9), T(t, 8, C.warn)], { gap: 3 });
 }
 
 function buildSmall(p, r) {
