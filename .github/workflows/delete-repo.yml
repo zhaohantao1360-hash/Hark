@@ -1,0 +1,26 @@
+name: 删除仓库
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 要删除的仓库名
+        required: true
+      confirm:
+        description: 再输一遍仓库名确认
+        required: true
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 删除仓库
+        env:
+          GH_TOKEN: ${{ secrets.REPO_TOKEN }}
+          NAME: ${{ inputs.name }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          [ "$NAME" = "$CONFIRM" ] || { echo "确认名不一致"; exit 1; }
+          [ "$NAME" != "Hark" ] || { echo "不允许删除 Hark"; exit 1; }
+          curl -sI -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/user | grep -i x-oauth-scopes
+          code=$(curl -s -o out.json -w '%{http_code}' -X DELETE -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/zhaohantao1360-hash/$NAME")
+          echo "HTTP $code"; cat out.json
+          [ "$code" = "204" ] || exit 1
