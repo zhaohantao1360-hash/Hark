@@ -31,7 +31,7 @@ scriptings:
   # 小组件脚本（generic）
   - generic:
       name: "china-mobile-hark-dash-total"
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-dash-total.js?v=20261024-1930"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-dash-total.js?v=20261031-1400"
       update_interval: 3600
       timeout: 20
       env:
@@ -44,7 +44,7 @@ scriptings:
   - schedule:
       name: "中国移动保活-Hark总量版"
       cron: "*/20 * * * *"
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-dash-total.js?v=20261024-1930"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-dash-total.js?v=20261031-1400"
       update_interval: 3600
       timeout: 30
       env:
@@ -55,7 +55,7 @@ scriptings:
   - http_request:
       name: "中国移动登录捕获-Hark总量版"
       match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-dash-total.js?v=20261024-1930"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-dash-total.js?v=20261031-1400"
       update_interval: 3600
       body_required: true
       timeout: 10
@@ -67,7 +67,7 @@ scriptings:
   - http_response:
       name: "中国移动Cookie捕获-Hark总量版"
       match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-dash-total.js?v=20261024-1930"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-dash-total.js?v=20261031-1400"
       update_interval: 3600
       timeout: 10
       env:

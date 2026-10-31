@@ -31,7 +31,7 @@ scriptings:
   # 小组件脚本（generic）
   - generic:
       name: "china-mobile-hark-ios"
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-ios.js?v=20261024-1930"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-ios.js?v=20261031-1400"
       timeout: 20
       env:
         CM_PHONENUMBER: ""           # 必填：11 位移动手机号
@@ -43,7 +43,7 @@ scriptings:
   - schedule:
       name: "中国移动保活-HarkiOS风格"
       cron: "*/20 * * * *"
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-ios.js?v=20261024-1930"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-ios.js?v=20261031-1400"
       timeout: 30
       env:
         CM_KEEPALIVE: "true"
@@ -53,7 +53,7 @@ scriptings:
   - http_request:
       name: "中国移动登录捕获-HarkiOS风格"
       match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-ios.js?v=20261024-1930"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-ios.js?v=20261031-1400"
       body_required: true
       timeout: 10
       env:
@@ -64,7 +64,7 @@ scriptings:
   - http_response:
       name: "中国移动Cookie捕获-HarkiOS风格"
       match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-ios.js?v=20261024-1930"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-ios.js?v=20261031-1400"
       timeout: 10
       env:
         CM_CAPTURE: "true"           # 抓取开关：false = 不再抓取（已登录好后可关，过期需再打开）
