@@ -31,7 +31,7 @@ scriptings:
   # 小组件脚本（generic）
   - generic:
       name: "china-mobile-hark-classic"
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-classic.js?v=20261022-0725"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-classic.js?v=20261102-0800"
       timeout: 20
       env:
         CM_PHONENUMBER: ""           # 必填：11 位移动手机号
@@ -39,11 +39,21 @@ scriptings:
         # CM_TITLE: "中国移动"        # 小组件标题
         # CM_DEBUG: "false"          # 'true' 显示调试信息
 
+  # 会话保活：每 20 分钟后台查询一次，登录快过期时自动重新签名续期
+  - schedule:
+      name: "中国移动保活-classic"
+      cron: "*/20 * * * *"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-classic.js?v=20261102-0800"
+      timeout: 90
+      env:
+        CM_KEEPALIVE: "true"
+        CM_PHONENUMBER: ""           # 与上面保持一致（留空则用小组件已保存的号码）
+
   # 登录参数捕获：在「中国移动」App 用短信验证码登录一次（建议关闭指纹/面容登录），看到通知即成功
   - http_request:
       name: "中国移动登录捕获-Hark原版风格"
       match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-classic.js?v=20261022-0725"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-classic.js?v=20261102-0800"
       body_required: true
       timeout: 10
       env:
@@ -54,7 +64,7 @@ scriptings:
   - http_response:
       name: "中国移动Cookie捕获-Hark原版风格"
       match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-classic.js?v=20261022-0725"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-classic.js?v=20261102-0800"
       timeout: 10
       env:
         CM_CAPTURE: "true"           # 抓取开关：false = 不再抓取（已登录好后可关，过期需再打开）

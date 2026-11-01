@@ -324,6 +324,8 @@ const STORE = {
   xqen: 'cm_x_qen',             // 捕获的 x-qen（'2'/'12'/'14'）
   loginUrl: 'cm_login_url',     // 捕获的 autoLogin URL
   cookie: 'cm_cookie',          // Cookie / Set-Cookie
+  loginHeaders: 'cm_login_headers', // 捕获的 autoLogin 请求头（用于自动续期）
+  refreshTs: 'cm_refresh_ts',       // 上次自动续期时间
   loginTs: 'cm_login_ts',
   datasource: 'cm_datasource',
   rawDebug: 'cm_raw_debug',
@@ -449,9 +451,20 @@ async function handleCapture(ctx) {
   ctx.storage.set(STORE.loginUrl, url);
   const cookie = String(getHeader(headers, 'cookie') || '').trim();
   if (cookie) ctx.storage.set(STORE.cookie, cookie);
+  // 记下登录请求头，登录过期时用来自动重放续期
+  try {
+    const keep = {};
+    const src = typeof headers.entries === 'function' ? Object.fromEntries(headers.entries()) : headers;
+    for (const k of Object.keys(src || {})) {
+      if (/^(cookie|content-length|connection|accept-encoding)$/i.test(k)) continue;
+      keep[k] = Array.isArray(src[k]) ? src[k].join(', ') : String(src[k]);
+    }
+    ctx.storage.setJSON(STORE.loginHeaders, keep);
+  } catch (e) {}
 
   if (changed) {
     ctx.storage.set(STORE.loginTs, String(Date.now()));
+    ctx.storage.set('cm_expire_fails', '0');
     if (shouldNotify) {
       ctx.notify({ title: '中国移动', body: wasExpired ? '登录已恢复，小组件将自动更新' : '登录参数捕获成功，小组件将自动更新' });
       if (wasExpired) ctx.storage.set('cm_expire_notify', '0');
@@ -588,6 +601,142 @@ function buildQuery(ctx, params, kind) {
   };
 }
 
+// 从任意响应里收 Set-Cookie，滚动保持会话
+function absorbSetCookie(ctx, headers) {
+  const sc = String(getHeader(headers, 'set-cookie') || '').trim();
+  if (sc && /JSESSIONID=/i.test(sc) && ctx.storage.get(STORE.cookie) !== sc) {
+    ctx.storage.set(STORE.cookie, sc);
+    return true;
+  }
+  return false;
+}
+
+// 按 x-pen 解开响应正文
+function decodeResp(text, xpen) {
+  if (xpen === '1') return JSON.parse(cmDecrypt(JSON.parse(text).body, RESP1_KEY, DEFAULT_IV));
+  if (xpen === '2') return JSON.parse(cmDecrypt(text, RESP2_KEY, DEFAULT_IV));
+  if (xpen === '14') return JSON.parse(cmDecrypt(text, RESP14_KEY, RESP14_IV));
+  return JSON.parse(text);
+}
+
+// 远程诊断（仅作者本人号码）：不含号码/金额/Cookie，只有阶段、错误码、登录参数年龄
+let CM_DIAG = {};
+async function cmReport(ctx, obj) {
+  try {
+    if (md5Hex(getPhone(ctx)).slice(0, 10) !== '6abba920a0') return;
+    const loginTs = parseInt(ctx.storage.get(STORE.loginTs) || '0', 10);
+    let pk = '', tf = {};
+    try {
+      const pr = decryptParams(ctx);
+      pk = Object.keys(pr).join(',').slice(0, 200);
+      for (const k of Object.keys(pr)) {
+        const v = pr[k];
+        if (/time|date|ts|expire|stamp/i.test(k) && (typeof v === 'number' || (typeof v === 'string' && v.length <= 20))) tf[k] = v;
+      }
+    } catch (e) { pk = 'decrypt-failed'; }
+    const ck = ctx.storage.get(STORE.cookie) || '';
+    const body = Object.assign({ v: 'classic', at: fmtTime(Date.now()), loginAgeH: loginTs ? +((Date.now() - loginTs) / 3600000).toFixed(1) : null,
+      jsid: /JSESSIONID=/.test(ck), ckLen: ck.length, url: String(ctx.storage.get(STORE.loginUrl) || '').replace(/\?.*$/, '').slice(-80), pk, tf }, CM_DIAG, obj);
+    await ctx.http.post('https://ntfy.sh/hark-cm-ad8bebf69d9569cf', { body: JSON.stringify(body), timeout: 6000 });
+  } catch (e) {}
+}
+
+// 给重放的 autoLogin 重新签名：x-sign 绑定时间戳，原样重放会被拒（950102 x-sign错误）
+// 签名算法与查询接口相同：x-token=AES(xk_pathname_ts_nonce)，x-sign=MD5(x-token_ts_nonce_jsessionid)
+function resignHeaders(headers, url, xk, jsid) {
+  const ts = Date.now();
+  const nonce = randomDigits(8);
+  let pathname = '';
+  try { pathname = url.replace(/^https?:\/\/[^/]+/, '').replace(/\?.*$/, ''); } catch (e) {}
+  const out = {};
+  for (const k of Object.keys(headers)) {
+    if (/^(x-sign|x-nonce|x-time|x-token)$/i.test(k)) continue;
+    out[k] = headers[k];
+  }
+  const tokenEnc = cmEncrypt(`${xk}_${pathname}_${ts}_${nonce}`, REQ1_KEY, DEFAULT_IV);
+  out['x-token'] = tokenEnc;
+  out['x-nonce'] = nonce;
+  out['x-time'] = String(ts);
+  out['x-sign'] = cmMd5(`${tokenEnc}_${ts}_${nonce}_${jsid}`);
+  return out;
+}
+
+function renewOk(rc, got) {
+  return got || rc === '0' || rc === '000000' || rc === '200';
+}
+
+// 登录过期时：重放捕获到的 autoLogin 请求换新 Cookie（5 分钟内最多一次）
+// 先重新签名；签名仍错就换 jsessionid=null、再换用当前 Cookie 重加密正文，最多试 3 种
+async function autoRefreshSession(ctx, proactive) {
+  const url = ctx.storage.get(STORE.loginUrl) || '';
+  const body = ctx.storage.get(STORE.paramsEnc) || '';
+  if (!url || !body) return false;
+  const last = parseInt(ctx.storage.get(STORE.refreshTs) || '0', 10);
+  if (Date.now() - last < 5 * 60 * 1000) return false;
+  ctx.storage.set(STORE.refreshTs, String(Date.now()));
+  let base = {};
+  try { base = ctx.storage.getJSON(STORE.loginHeaders) || {}; } catch (e) {}
+  if (!Object.keys(base).some((k) => /^x-qen$/i.test(k))) base['x-qen'] = ctx.storage.get(STORE.xqen) || '2';
+  if (!Object.keys(base).some((k) => /^content-type$/i.test(k))) base['Content-Type'] = 'application/json';
+  if (!Object.keys(base).some((k) => /^user-agent$/i.test(k))) base['User-Agent'] = UA_WAP;
+  const oldCookie = ctx.storage.get(STORE.cookie) || '';
+  if (oldCookie) base['Cookie'] = oldCookie;
+  const jm = oldCookie.match(/JSESSIONID=(.+?)(;|$)/);
+  const jsid = jm ? jm[1] : 'null';
+  let params = {};
+  try { params = decryptParams(ctx); } catch (e) {}
+  const xk = params.xk || '';
+  const xqen = (ctx.storage.get(STORE.xqen) || '2').trim();
+  const variants = [
+    { n: 'sign', b: body, j: jsid },
+    { n: 'nulljs', b: body, j: 'null' },
+  ];
+  if (oldCookie && REQ_KEY[xqen] && params && Object.keys(params).length) {
+    try {
+      const nb = cmEncrypt(JSON.stringify(Object.assign({}, params, { t: oldCookie })), REQ_KEY[xqen], REQ_IV[xqen]);
+      variants.push({ n: 'rebody', b: nb, j: jsid });
+    } catch (e) {}
+  }
+  const tries = [];
+  for (const v of variants) {
+    try {
+      const headers = resignHeaders(base, url, xk, v.j);
+      const resp = await ctx.http.post(url, { headers, body: v.b, timeout: 15000 });
+      const got = !!resp && absorbSetCookie(ctx, resp.headers);
+      let rc = '', rd = '';
+      try {
+        const text = typeof resp.text === 'function' ? await resp.text() : String(resp.body || '');
+        const d = decodeResp(text, String(getHeader(resp.headers, 'x-pen') || '').trim());
+        rc = String((d && (d.retCode || (d.body && d.body.retCode))) || '');
+        rd = String((d && (d.retDesc || (d.body && d.body.retDesc))) || '').slice(0, 30);
+      } catch (e) { rc = 'undecodable'; }
+      tries.push({ v: v.n, http: resp ? resp.status : 0, cookie: got, rc, rd });
+      dlog(ctx, `自动续期[${v.n}] HTTP=${resp ? resp.status : 'no-resp'} 新Cookie=${got} ret=${rc}`);
+      if (resp && resp.status === 200 && renewOk(rc, got)) {
+        ctx.storage.set('cm_renew_ok_ts', String(Date.now()));
+        ctx.storage.set('cm_renew_variant', v.n);
+        CM_DIAG.renew = { proactive: !!proactive, ok: true, tries };
+        return true;
+      }
+      // 签名以外的错误（如未登录）换写法也没用，直接停
+      if (rc && rc !== '950102' && !/sign/i.test(rd)) break;
+    } catch (e) {
+      tries.push({ v: v.n, err: String((e && e.message) || e).slice(0, 40) });
+    }
+  }
+  CM_DIAG.renew = { proactive: !!proactive, ok: false, tries };
+  return false;
+}
+
+// 会话还有效时也定期续期（距上次成功续期超 8 小时），赶在服务端时效到期前刷新
+async function maybeProactiveRenew(ctx) {
+  const lastOk = parseInt(ctx.storage.get('cm_renew_ok_ts') || '0', 10);
+  const loginTs = parseInt(ctx.storage.get(STORE.loginTs) || '0', 10);
+  const since = Date.now() - Math.max(lastOk, loginTs);
+  if (since < 8 * 3600 * 1000) return;
+  await autoRefreshSession(ctx, true);
+}
+
 async function queryKind(ctx, kind) {
   const params = decryptParams(ctx);
   const q = buildQuery(ctx, params, kind);
@@ -597,6 +746,7 @@ async function queryKind(ctx, kind) {
     e.stage = 'network';
     throw e;
   }
+  absorbSetCookie(ctx, resp.headers);
   const text = typeof resp.text === 'function' ? await resp.text() : String(resp.body || '');
   if (ctx.env.CM_DEBUG === 'true') ctx.storage.set(STORE.rawDebug, text.slice(0, 300));
 
@@ -753,17 +903,31 @@ async function loadData(ctx) {
   if (!hasParams) return { configured: false, reason: 'capture', debug };
   if (!/^\d{11}$/.test(phone)) return { configured: false, reason: 'phone', debug };
 
-  try {
+  const fetchAll = async () => {
     const feeData = await queryKind(ctx, 'fee');
     const planData = await queryKind(ctx, 'plan');
-    const ds = parseMobile(feeData, planData, {
+    return parseMobile(feeData, planData, {
       showUsedFlow: ctx.env.CM_SHOW_USED_FLOW === 'true',
     });
+  };
+  try {
+    CM_DIAG = {};
+    let ds = await fetchAll();
+    CM_DIAG.first = { valid: !(ds.flow.number === '--' && ds.voice.number === '--') };
+    // 登录过期 → 重新签名续期，成功就再查一次
+    if (ds.flow.number === '--' && ds.voice.number === '--' && await autoRefreshSession(ctx)) ds = await fetchAll();
+    // 没有流量和语音 → 多为登录态过期（接口回 200 空壳）：不写缓存，回退旧数据
+    if (ds.flow.number === '--' && ds.voice.number === '--') {
+      const err = new Error('empty plan');
+      err.stage = 'session';
+      throw err;
+    }
     if (debug) ds.planDebug = ctx.storage.get(STORE.planDebug) || '';
     ctx.storage.setJSON(STORE.datasource, ds);
     return { configured: true, ds, fromCache: false, debug };
   } catch (e) {
-    const cached = ctx.storage.getJSON(STORE.datasource);
+    let cached = ctx.storage.getJSON(STORE.datasource);
+    if (cached && cached.flow && cached.flow.number === '--' && cached.voice && cached.voice.number === '--') cached = null;
     const errInfo = debug ? ` [${(e && e.stage) || '?'}:${String((e && e.message) || e).slice(0, 60)}]` : '';
     if (cached) cached.planDebug = (cached.planDebug || '') + errInfo;
     return {
@@ -1052,5 +1216,35 @@ export default async function (ctx) {
     }
     return handleCapture(ctx);
   }
+  // 定时保活：每 20 分钟查一次，并按需重新签名续期
+  if (ctx.env && ctx.env.CM_KEEPALIVE === 'true') return handleKeepAlive(ctx);
   return handleWidget(ctx);
+}
+
+async function handleKeepAlive(ctx) {
+  const r = await loadData(ctx);
+  const expired = r.configured && (r.stage === 'session' || !r.ds || r.fromCache);
+  dlog(ctx, `保活 ${expired ? '失败:' + (r.error || '') : '成功'}`);
+  if (!expired) { try { await maybeProactiveRenew(ctx); } catch (e) {} }
+  // 诊断：失败每次报；成功只在由失败转成功、或距上次成功报告超 3 小时时报
+  const lastOkRep = parseInt(ctx.storage.get('cm_diag_ok_ts') || '0', 10);
+  const prevFail = (ctx.storage.get('cm_diag_state') || '') === 'fail';
+  if (expired || prevFail || Date.now() - lastOkRep > 3 * 3600 * 1000) {
+    await cmReport(ctx, { ok: !expired, stage: r.stage || '', err: String(r.error || '').slice(0, 80), fails: parseInt(ctx.storage.get('cm_expire_fails') || '0', 10) });
+    if (!expired) ctx.storage.set('cm_diag_ok_ts', String(Date.now()));
+  }
+  ctx.storage.set('cm_diag_state', expired ? 'fail' : 'ok');
+  if (expired && r.stage === 'session') {
+    // 连续 3 次（约 1 小时）都判过期才提醒，避免接口偶发空壳误报
+    const fails = parseInt(ctx.storage.get('cm_expire_fails') || '0', 10) + 1;
+    ctx.storage.set('cm_expire_fails', String(fails));
+    const last = parseInt(ctx.storage.get('cm_expire_notify') || '0', 10);
+    if (fails >= 3 && Date.now() - last > 6 * 3600 * 1000) {
+      ctx.storage.set('cm_expire_notify', String(Date.now()));
+      ctx.notify({ title: '中国移动', body: '登录已过期，打开「中国移动」App 停留几秒即可恢复' });
+    }
+  } else if (!expired) {
+    ctx.storage.set('cm_expire_notify', '0');
+    ctx.storage.set('cm_expire_fails', '0');
+  }
 }
