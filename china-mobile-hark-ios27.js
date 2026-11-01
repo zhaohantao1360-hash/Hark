@@ -641,41 +641,100 @@ async function cmReport(ctx, obj) {
   } catch (e) {}
 }
 
+// 给重放的 autoLogin 重新签名：x-sign 绑定时间戳，原样重放会被拒（950102 x-sign错误）
+// 签名算法与查询接口相同：x-token=AES(xk_pathname_ts_nonce)，x-sign=MD5(x-token_ts_nonce_jsessionid)
+function resignHeaders(headers, url, xk, jsid) {
+  const ts = Date.now();
+  const nonce = randomDigits(8);
+  let pathname = '';
+  try { pathname = url.replace(/^https?:\/\/[^/]+/, '').replace(/\?.*$/, ''); } catch (e) {}
+  const out = {};
+  for (const k of Object.keys(headers)) {
+    if (/^(x-sign|x-nonce|x-time|x-token)$/i.test(k)) continue;
+    out[k] = headers[k];
+  }
+  const tokenEnc = cmEncrypt(`${xk}_${pathname}_${ts}_${nonce}`, REQ1_KEY, DEFAULT_IV);
+  out['x-token'] = tokenEnc;
+  out['x-nonce'] = nonce;
+  out['x-time'] = String(ts);
+  out['x-sign'] = cmMd5(`${tokenEnc}_${ts}_${nonce}_${jsid}`);
+  return out;
+}
+
+function renewOk(rc, got) {
+  return got || rc === '0' || rc === '000000' || rc === '200';
+}
+
 // 登录过期时：重放捕获到的 autoLogin 请求换新 Cookie（5 分钟内最多一次）
-async function autoRefreshSession(ctx) {
+// 先重新签名；签名仍错就换 jsessionid=null、再换用当前 Cookie 重加密正文，最多试 3 种
+async function autoRefreshSession(ctx, proactive) {
   const url = ctx.storage.get(STORE.loginUrl) || '';
   const body = ctx.storage.get(STORE.paramsEnc) || '';
   if (!url || !body) return false;
   const last = parseInt(ctx.storage.get(STORE.refreshTs) || '0', 10);
   if (Date.now() - last < 5 * 60 * 1000) return false;
   ctx.storage.set(STORE.refreshTs, String(Date.now()));
-  let headers = {};
-  try { headers = ctx.storage.getJSON(STORE.loginHeaders) || {}; } catch (e) {}
-  if (!Object.keys(headers).some((k) => /^x-qen$/i.test(k))) headers['x-qen'] = ctx.storage.get(STORE.xqen) || '2';
-  if (!Object.keys(headers).some((k) => /^content-type$/i.test(k))) headers['Content-Type'] = 'application/json';
-  if (!Object.keys(headers).some((k) => /^user-agent$/i.test(k))) headers['User-Agent'] = UA_WAP;
+  let base = {};
+  try { base = ctx.storage.getJSON(STORE.loginHeaders) || {}; } catch (e) {}
+  if (!Object.keys(base).some((k) => /^x-qen$/i.test(k))) base['x-qen'] = ctx.storage.get(STORE.xqen) || '2';
+  if (!Object.keys(base).some((k) => /^content-type$/i.test(k))) base['Content-Type'] = 'application/json';
+  if (!Object.keys(base).some((k) => /^user-agent$/i.test(k))) base['User-Agent'] = UA_WAP;
   const oldCookie = ctx.storage.get(STORE.cookie) || '';
-  if (oldCookie) headers['Cookie'] = oldCookie;
-  try {
-    const resp = await ctx.http.post(url, { headers, body, timeout: 15000 });
-    const got = !!resp && absorbSetCookie(ctx, resp.headers);
-    // 只要 HTTP 200 就再查一次：有的续期不换 JSESSIONID 但会话已被刷新
-    const ok = !!resp && resp.status === 200;
-    let rc = '', rd = '';
+  if (oldCookie) base['Cookie'] = oldCookie;
+  const jm = oldCookie.match(/JSESSIONID=(.+?)(;|$)/);
+  const jsid = jm ? jm[1] : 'null';
+  let params = {};
+  try { params = decryptParams(ctx); } catch (e) {}
+  const xk = params.xk || '';
+  const xqen = (ctx.storage.get(STORE.xqen) || '2').trim();
+  const variants = [
+    { n: 'sign', b: body, j: jsid },
+    { n: 'nulljs', b: body, j: 'null' },
+  ];
+  if (oldCookie && REQ_KEY[xqen] && params && Object.keys(params).length) {
     try {
-      const text = typeof resp.text === 'function' ? await resp.text() : String(resp.body || '');
-      const d = decodeResp(text, String(getHeader(resp.headers, 'x-pen') || '').trim());
-      rc = String((d && (d.retCode || (d.body && d.body.retCode))) || '');
-      rd = String((d && (d.retDesc || (d.body && d.body.retDesc))) || '').slice(0, 40);
-    } catch (e) { rc = 'undecodable'; }
-    CM_DIAG.renew = { http: resp ? resp.status : 0, cookie: got, rc, rd };
-    dlog(ctx, `自动续期 HTTP=${resp ? resp.status : 'no-resp'} 新Cookie=${got} ret=${rc}`);
-    return ok;
-  } catch (e) {
-    CM_DIAG.renew = { err: String((e && e.message) || e).slice(0, 60) };
-    dlog(ctx, `自动续期失败: ${String((e && e.message) || e).slice(0, 80)}`);
-    return false;
+      const nb = cmEncrypt(JSON.stringify(Object.assign({}, params, { t: oldCookie })), REQ_KEY[xqen], REQ_IV[xqen]);
+      variants.push({ n: 'rebody', b: nb, j: jsid });
+    } catch (e) {}
   }
+  const tries = [];
+  for (const v of variants) {
+    try {
+      const headers = resignHeaders(base, url, xk, v.j);
+      const resp = await ctx.http.post(url, { headers, body: v.b, timeout: 15000 });
+      const got = !!resp && absorbSetCookie(ctx, resp.headers);
+      let rc = '', rd = '';
+      try {
+        const text = typeof resp.text === 'function' ? await resp.text() : String(resp.body || '');
+        const d = decodeResp(text, String(getHeader(resp.headers, 'x-pen') || '').trim());
+        rc = String((d && (d.retCode || (d.body && d.body.retCode))) || '');
+        rd = String((d && (d.retDesc || (d.body && d.body.retDesc))) || '').slice(0, 30);
+      } catch (e) { rc = 'undecodable'; }
+      tries.push({ v: v.n, http: resp ? resp.status : 0, cookie: got, rc, rd });
+      dlog(ctx, `自动续期[${v.n}] HTTP=${resp ? resp.status : 'no-resp'} 新Cookie=${got} ret=${rc}`);
+      if (resp && resp.status === 200 && renewOk(rc, got)) {
+        ctx.storage.set('cm_renew_ok_ts', String(Date.now()));
+        ctx.storage.set('cm_renew_variant', v.n);
+        CM_DIAG.renew = { proactive: !!proactive, ok: true, tries };
+        return true;
+      }
+      // 签名以外的错误（如未登录）换写法也没用，直接停
+      if (rc && rc !== '950102' && !/sign/i.test(rd)) break;
+    } catch (e) {
+      tries.push({ v: v.n, err: String((e && e.message) || e).slice(0, 40) });
+    }
+  }
+  CM_DIAG.renew = { proactive: !!proactive, ok: false, tries };
+  return false;
+}
+
+// 会话还有效时也定期续期（距上次成功续期超 8 小时），赶在服务端时效到期前刷新
+async function maybeProactiveRenew(ctx) {
+  const lastOk = parseInt(ctx.storage.get('cm_renew_ok_ts') || '0', 10);
+  const loginTs = parseInt(ctx.storage.get(STORE.loginTs) || '0', 10);
+  const since = Date.now() - Math.max(lastOk, loginTs);
+  if (since < 8 * 3600 * 1000) return;
+  await autoRefreshSession(ctx, true);
 }
 
 async function queryKind(ctx, kind) {
@@ -1408,6 +1467,7 @@ async function handleKeepAlive(ctx) {
   const r = await loadData(ctx);
   const expired = r.configured && (r.stage === 'session' || !r.ds || r.fromCache);
   dlog(ctx, `保活 ${expired ? '失败:' + (r.error || '') : '成功'}`);
+  if (!expired) { try { await maybeProactiveRenew(ctx); } catch (e) {} }
   // 诊断：失败每次报；成功只在由失败转成功、或距上次成功报告超 3 小时时报
   const lastOkRep = parseInt(ctx.storage.get('cm_diag_ok_ts') || '0', 10);
   const prevFail = (ctx.storage.get('cm_diag_state') || '') === 'fail';
