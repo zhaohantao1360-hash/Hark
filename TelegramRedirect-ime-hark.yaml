@@ -1,0 +1,19 @@
+name: Telegram重定向（iMe）
+description: t.me 链接一律跳转到 iMe（固定版，无需设置）。用户名、频道消息、话题、私有邀请、贴纸、分享、代理链接都支持。Hark 改写。
+author: 可莉（Egern 原生版由 Hark 改写）
+homepage: https://hub.kelee.one
+icon: https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Telegram.png
+scriptings:
+- http_request:
+    name: Telegram重定向-iMe
+    match: ^https?://(www\.)?(t|telegram)\.me/.+
+    script_url: https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/TelegramRedirect-hark.js?v=2
+    timeout: 5
+    env:
+      APP: ime
+mitm:
+  hostnames:
+    includes:
+    - t.me
+    - www.t.me
+    - telegram.me
