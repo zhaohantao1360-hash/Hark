@@ -720,7 +720,7 @@ async function autoRefreshSession(ctx, proactive) {
         return true;
       }
       // 签名以外的错误（如未登录）换写法也没用，直接停
-      if (rc && rc !== '950102' && rc !== 'undecodable' && !/sign/i.test(rd)) break;
+      if (rc && rc !== '950102' && rc !== '-9999' && rc !== 'undecodable' && !/sign/i.test(rd)) break;
     } catch (e) {
       tries.push({ v: v.n, err: String((e && e.message) || e).slice(0, 40) });
     }
