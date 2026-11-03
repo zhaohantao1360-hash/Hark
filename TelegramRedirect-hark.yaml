@@ -1,5 +1,5 @@
 name: "Telegram重定向"
-description: "在 Safari 等浏览器里打开 t.me 公开/私有群组与频道短链时，307 跳转到指定的 Telegram 客户端。在本模块设置页的「客户端」里选择。源自可莉 TelegramRedirect.lpx（2026-10-02），原插件用 Loon 3.5 新语法、Egern 无法识别，由 Hark 改写。"
+description: "在 Safari 等浏览器里打开 t.me 公开/私有群组与频道短链时，307 跳转到指定的 Telegram 客户端。在本模块设置页的「客户端」里选择。支持用户名、频道消息、话题、私有邀请、贴纸、分享、代理链接；逻辑参考 lylywayr TelegramRedirect.js 与可莉 TelegramRedirect.lpx，原插件用 Loon 3.5 新语法、Egern 无法识别，由 Hark 改写。"
 author: "可莉（Egern 原生版由 Hark 改写）"
 homepage: "https://hub.kelee.one"
 icon: "https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Telegram.png"
@@ -20,11 +20,13 @@ env_schema:
 scriptings:
   - http_request:
       name: "Telegram重定向"
-      match: "^https://t\\.me/(\\+[A-Za-z0-9_-]+|[A-Za-z][A-Za-z0-9_]{3,30}[A-Za-z0-9])/?$"
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/TelegramRedirect-hark.js?v=1"
+      match: "^https?://(www\\.)?(t|telegram)\\.me/.+"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/TelegramRedirect-hark.js?v=2"
       timeout: 5
 
 mitm:
   hostnames:
     includes:
       - "t.me"
+      - "www.t.me"
+      - "telegram.me"
