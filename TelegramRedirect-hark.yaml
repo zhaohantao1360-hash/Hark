@@ -1,22 +1,28 @@
 name: "Telegram重定向"
-description: "在 Safari 等浏览器里打开 t.me 公开/私有群组与频道短链时，307 跳转到指定的 Telegram 客户端。源自可莉 TelegramRedirect.lpx（2026-10-02），因原插件用 Loon 3.5 新语法、Egern 无法识别，由 Hark 改写为 Egern 原生版。"
+description: "在 Safari 等浏览器里打开 t.me 公开/私有群组与频道短链时，307 跳转到指定的 Telegram 客户端。在本模块设置页的「客户端」里选择。源自可莉 TelegramRedirect.lpx（2026-10-02），原插件用 Loon 3.5 新语法、Egern 无法识别，由 Hark 改写。"
 author: "可莉（Egern 原生版由 Hark 改写）"
 homepage: "https://hub.kelee.one"
 icon: "https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Telegram.png"
 
-compat_arguments:
-  APP: "tg"
-compat_arguments_desc: "APP 为要跳转的客户端 URL Scheme：tg（官方 Telegram）、sg（Swiftgram）、turrit（Turrit）、ime（iMe）、ng（Nicegram）、lingo（Telegram Lingo）。在主配置该模块的 compat_arguments 里改，例如 APP: \"turrit\"。"
+env_schema:
+  APP:
+    name: "客户端"
+    description: "tg 官方 Telegram｜sg Swiftgram｜turrit Turrit｜ime iMe｜ng Nicegram｜lingo Telegram Lingo；不选默认 tg"
+    default_value: "tg"
+    options:
+      - "tg"
+      - "sg"
+      - "turrit"
+      - "ime"
+      - "ng"
+      - "lingo"
 
-url_rewrites:
-  # 公开群组/频道：https://t.me/用户名
-  - match: "^https://t\\.me/([A-Za-z][A-Za-z0-9_]{3,30}[A-Za-z0-9])/?$"
-    location: "{{{APP}}}://resolve?domain=$1"
-    status_code: 307
-  # 私有邀请链接：https://t.me/+邀请码
-  - match: "^https://t\\.me/\\+([A-Za-z0-9_-]+)/?$"
-    location: "{{{APP}}}://join?invite=$1"
-    status_code: 307
+scriptings:
+  - http_request:
+      name: "Telegram重定向"
+      match: "^https://t\\.me/(\\+[A-Za-z0-9_-]+|[A-Za-z][A-Za-z0-9_]{3,30}[A-Za-z0-9])/?$"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/TelegramRedirect-hark.js?v=1"
+      timeout: 5
 
 mitm:
   hostnames:
