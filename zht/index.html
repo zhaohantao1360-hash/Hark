@@ -63,6 +63,9 @@ header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 8
 .pill.p{color:#2563eb;background:color-mix(in srgb,#2563eb 12%,transparent)}
 html.dark .pill.d{color:#4ade80}html.dark .pill.r{color:#f87171}html.dark .pill.p{color:#60a5fa}
 .chip span{opacity:.55;margin-left:3px;font-size:11px}
+.sec{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:600;margin:6px 0 14px;scroll-margin-top:190px}.sec span{font-size:12px;font-weight:500;color:var(--muted);background:var(--sec);border-radius:999px;padding:1px 8px}
+#grid .grid{margin-bottom:34px}
+.toc{max-height:70vh;overflow:auto;padding:14px 16px 18px}.toc h4{font-size:15px;font-weight:600;margin:6px 4px 8px}.toc details{border:1px solid var(--border);border-radius:12px;margin-bottom:8px;overflow:hidden}.toc summary{list-style:none;display:flex;align-items:center;gap:8px;padding:11px 14px;font-size:14px;cursor:pointer}.toc summary::-webkit-details-marker{display:none}.toc summary b{font-weight:500}.toc summary span{margin-left:auto;font-size:12px;color:var(--muted)}.toc summary:after{content:"›";color:var(--muted);transition:.2s}.toc details[open] summary:after{transform:rotate(90deg)}.toc .tl{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 12px}.toc .tl a{font-size:12.5px;border:1px solid var(--border);border-radius:8px;padding:4px 9px;cursor:pointer;color:var(--fg)}.toc .tl a:hover{background:var(--sec)}.toc .tl a.go{background:var(--pri);color:var(--pri-fg);border-color:var(--pri)}.toc .tl a.off{opacity:.55}
 .empty{text-align:center;color:var(--muted);padding:60px 0;display:none}
 footer{border-top:1px solid var(--border);padding:26px 0 40px;color:var(--muted);font-size:13px;text-align:center;line-height:1.9}
 /* 弹层 */
@@ -113,6 +116,7 @@ footer{border-top:1px solid var(--border);padding:26px 0 40px;color:var(--muted)
   <a class="brand" href="./"><div class="logo">ZHT</div>ZHT 收藏夹</a>
   <button class="sbtn" onclick="openCmd()"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>搜索插件、分流、模块…</span><kbd>⌘K</kbd></button>
   <a class="ibtn" href="https://github.com/zhaohantao1360-hash/Hark" target="_blank" rel="noopener" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.7 1.7.3 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5z"/></svg></a>
+  <button class="ibtn" onclick="openToc()" title="目录"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg></button>
   <button class="ibtn" onclick="toggleTheme()" title="切换主题"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
 </div></header>
 
@@ -124,7 +128,7 @@ footer{border-top:1px solid var(--border);padding:26px 0 40px;color:var(--muted)
   </div>
   <div class="filters"><div class="tabsw"><div class="tabs" id="tabs"></div></div>
   <div class="chips" id="chips"></div></div>
-  <div class="grid" id="grid"></div>
+  <div id="grid"></div>
   <div class="empty" id="empty">这个分类下还没有内容</div>
 </main>
 <footer class="wrap">由 ZHT 整理 · 插件与规则版权归原作者<br>© <span id="yr"></span> ZHT</footer>
@@ -135,6 +139,7 @@ footer{border-top:1px solid var(--border);padding:26px 0 40px;color:var(--muted)
   <div class="res" id="res"></div>
 </div></div>
 <div class="mask" id="detm" onclick="if(event.target===this)hide('detm')"><div class="panel"><div class="det" id="det"></div></div></div>
+<div class="mask" id="tocm" onclick="if(event.target===this)hide('tocm')"><div class="panel"><div class="toc" id="toc"></div></div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -198,20 +203,31 @@ function renderTabs(){
 function render(){
   renderTabs();
   const T=TABS.find(t=>t.k===tab);const list=T.items.filter(i=>chip==="全部"||i.cat===chip).sort((a,b)=>b.on-a.on);
-  $("grid").innerHTML=list.map((it,n)=>{
+  const card=(it,n)=>{
     const st=it.on?"":`<span class="tag">未启用</span>`;
     const d=it.desc||sub(it)||"";
     return `<div class="card${it.on?"":" off"}" style="animation-delay:${Math.min(n,12)*35}ms">${st}
       <div class="ch">${avatar(it)}<h3>${esc(it.name)}</h3>${pill(it)}</div>
       <div class="cb"><p>${esc(it.type==="rule"?(it.desc||""):d)}</p></div>
       <div class="cf"><a class="inst" href="${esc(link(it))}" >${svg("down")}${btnText(it)}</a>
-      <button class="more" onclick="detail('${it.id}')">详情 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button></div></div>`}).join("");
+      <button class="more" onclick="detail('${it.id}')">详情 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button></div></div>`};
+  const cats=[...new Set(list.map(i=>i.cat))];
+  $("grid").innerHTML=chip==="全部"&&cats.length>1
+    ?cats.map(c=>{const g=list.filter(i=>i.cat===c);return `<h2 class="sec" id="c-${esc(c)}">${esc(c)}<span>${g.length}</span></h2><div class="grid">${g.map(card).join("")}</div>`}).join("")
+    :`<div class="grid">${list.map(card).join("")}</div>`;
   $("empty").style.display=list.length?"none":"block";
 }
 function setTab(k){tab=k;chip="全部";localStorage.setItem("zht2_tab",k);render();scrollTo({top:0,behavior:"smooth"})}
 function setChip(c){chip=c;render()}
+function openToc(){
+  $("toc").innerHTML=`<h4>目录</h4>`+TABS.map(t=>{const cats=[...new Set(t.items.map(i=>i.cat))];
+    return `<details${t.k===tab?" open":""}><summary><b>${t.t}</b><span>${t.items.length}</span></summary><div class="tl">${cats.map(c=>`<a class="go" onclick="jump('${t.k}','${esc(c)}')">${esc(c)} ${t.items.filter(i=>i.cat===c).length}</a>`).join("")}</div>
+    <div class="tl">${t.items.slice().sort((a,b)=>b.on-a.on).map(it=>`<a class="${it.on?"":"off"}" onclick="detail('${it.id}')">${esc(it.name)}</a>`).join("")}</div></details>`}).join("");
+  $("tocm").classList.add("show");
+}
+function jump(k,c){hide("tocm");tab=k;chip="全部";localStorage.setItem("zht2_tab",k);render();setTimeout(()=>{const e=document.getElementById("c-"+c);e?e.scrollIntoView({behavior:"smooth"}):scrollTo({top:0})},60)}
 function detail(id){
-  const it=ALL.find(x=>x.id===id);if(!it)return;hide("cmd");
+  const it=ALL.find(x=>x.id===id);if(!it)return;hide("cmd");hide("tocm");
   const rows=[["类型",{plugin:"Loon 插件",rule:"Loon 分流",egern:"Egern 模块",surge:"Surge 模块"}[it.type]+" · "+it.cat]];
   if(it.policy)rows.push(["策略",it.policy]);
   if(it.author)rows.push(["来源",it.author]);
@@ -237,7 +253,7 @@ function drawRes(){
 }
 $("cq").oninput=search;
 $("cq").onkeydown=e=>{if(e.key==="ArrowDown"){sel=Math.min(sel+1,hits.length-1);drawRes();e.preventDefault()}else if(e.key==="ArrowUp"){sel=Math.max(sel-1,0);drawRes();e.preventDefault()}else if(e.key==="Enter"&&hits[sel])detail(hits[sel].id)};
-document.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openCmd()}if(e.key==="Escape"){hide("cmd");hide("detm")}});
+document.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openCmd()}if(e.key==="Escape"){hide("cmd");hide("detm");hide("tocm")}});
 function toggleTheme(){const d=document.documentElement.classList.toggle("dark");localStorage.setItem("zht2_theme",d?"dark":"light")}
 const th=localStorage.getItem("zht2_theme");if(th?th==="dark":matchMedia("(prefers-color-scheme: dark)").matches)document.documentElement.classList.add("dark");
 $("yr").textContent=new Date().getFullYear();
