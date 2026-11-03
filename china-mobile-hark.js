@@ -703,14 +703,15 @@ async function autoRefreshSession(ctx, proactive) {
       const headers = resignHeaders(base, url, xk, v.j);
       const resp = await ctx.http.post(url, { headers, body: v.b, timeout: 15000 });
       const got = !!resp && absorbSetCookie(ctx, resp.headers);
-      let rc = '', rd = '';
+      let rc = '', rd = '', raw = '';
       try {
         const text = typeof resp.text === 'function' ? await resp.text() : String(resp.body || '');
+        raw = 'pen=' + String(getHeader(resp.headers, 'x-pen') || '') + ' len=' + text.length + ' ' + text.slice(0, 50).replace(/[0-9]{6,}/g, '#');
         const d = decodeResp(text, String(getHeader(resp.headers, 'x-pen') || '').trim());
         rc = String((d && (d.retCode || (d.body && d.body.retCode))) || '');
         rd = String((d && (d.retDesc || (d.body && d.body.retDesc))) || '').slice(0, 30);
       } catch (e) { rc = 'undecodable'; }
-      tries.push({ v: v.n, http: resp ? resp.status : 0, cookie: got, rc, rd });
+      tries.push({ v: v.n, http: resp ? resp.status : 0, cookie: got, rc, rd: rc === 'undecodable' ? raw : rd });
       dlog(ctx, `自动续期[${v.n}] HTTP=${resp ? resp.status : 'no-resp'} 新Cookie=${got} ret=${rc}`);
       if (resp && resp.status === 200 && renewOk(rc, got)) {
         ctx.storage.set('cm_renew_ok_ts', String(Date.now()));
@@ -719,7 +720,7 @@ async function autoRefreshSession(ctx, proactive) {
         return true;
       }
       // 签名以外的错误（如未登录）换写法也没用，直接停
-      if (rc && rc !== '950102' && !/sign/i.test(rd)) break;
+      if (rc && rc !== '950102' && rc !== 'undecodable' && !/sign/i.test(rd)) break;
     } catch (e) {
       tries.push({ v: v.n, err: String((e && e.message) || e).slice(0, 40) });
     }
