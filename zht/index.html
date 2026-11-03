@@ -259,7 +259,7 @@ const th=localStorage.getItem("zht2_theme");if(th?th==="dark":matchMedia("(prefe
 $("yr").textContent=new Date().getFullYear();
 if(!TABS.find(t=>t.k===tab))tab="plugins";
 const on=TABS.flatMap(t=>t.items).filter(i=>i.on).length;
-$("stats").innerHTML=TABS.map(t=>`<span><b>${t.items.length}</b> ${{plugins:"个插件",rules:"条分流",egern:"个 Egern 模块",surge:"个 Surge 模块"}[t.k]}</span>`).join("")+`<span><b>${on}</b> 个启用中</span>`;
+$("stats").innerHTML=TABS.map(t=>`<span><b>${t.items.length}</b> ${{plugins:"个 Loon 插件",rules:"条 Loon 分流",egern:"个 Egern 模块",surge:"个 Surge 模块"}[t.k]}</span>`).join("")+`<span><b>${on}</b> 个启用中</span>`;
 render();
 </script>
 </body>
