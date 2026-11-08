@@ -1,5 +1,5 @@
 name: "微信"
-description: "微信公众号、小程序去广告以及微信外部链接解锁。源自 loon.103516.xyz WeChat.lpx（2026-10-02 12:00，整合可莉等作者规则），每周由 GitHub Actions 自动转换。"
+description: "微信公众号、小程序去广告以及微信外部链接解锁。源自 loon.103516.xyz WeChat.lpx（2026-11-02 21:00，整合可莉等作者规则），每周由 GitHub Actions 自动转换。"
 author: "RuCu6, zZPiglet, blackmatrix7, zirawell, 可莉（Egern 原生版由 Hark 改写）"
 icon: "https://raw.githubusercontent.com/sooyaaabo/IconLibrary/main/App/WeChat.png"
 
