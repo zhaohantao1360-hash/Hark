@@ -379,8 +379,10 @@ function randomDigits(n) {
 /* ==================== 捕获 ==================== */
 
 function isAutoLogin(url) {
-  // 新主机：中国移动 App 实际走 10086.online-cmcc.cn:20010，登录路径待确认，先放行由 x-qen 过滤
-  if (/10086\.online-cmcc\.cn/.test(url)) return true;
+  // 新主机 10086.online-cmcc.cn：只认登录/会话刷新路径。
+  // 之前整站放行，App 里的 queryCardInfo 等普通查询会覆盖掉 autoLogin 模板，
+  // 导致查询参数错（empty plan）、续期重放的也不是登录接口。
+  if (/10086\.online-cmcc\.cn/.test(url)) return /(autoLogin|refreshSession|\/login)/i.test(url.replace(/\?.*$/, ''));
   // 老主机：autoLogin（登录）与 refreshSession（会话刷新，App 自动调用）都认
   return /client\.app\.coc\.10086\.cn/.test(url) &&
     /\/biz-orange\/[A-Z]{2}\/.*(autoLogin|refreshSession)/.test(url);
