@@ -309,6 +309,8 @@ const REQ_KEY = { '2': 'bAIgvwAuA4tbDr9d', '12': 'V0dSUFZtS1NWRnJa', '14': 'tVkd
 const REQ_IV  = { '2': '9791027341711819', '12': 'UkdWMVpWTVVWaGVq', '14': 'VjFSQ1ZtVkQxRTlQ' };
 // 查询请求/响应的加解密（x-qen 固定为 '1'）
 const REQ1_KEY = 'foorettD7vcBawt3';
+// autoLogin 换会话用的 x-token 密钥：登录接口与查询接口不同（查询用 REQ1_KEY）
+const TOK_KEY = 'bAIgvwAuA4tbDr9d';
 const RESP1_KEY = 'UVic06tpXgMNiApm';
 const RESP2_KEY = 'GS7VelkJl5IT1uwQ';
 const RESP14_KEY = 'RYV0hCV1lV25KYVJ';
@@ -642,7 +644,9 @@ async function cmReport(ctx, obj) {
 }
 
 // 给重放的 autoLogin 重新签名：x-sign 绑定时间戳，原样重放会被拒（950102 x-sign错误）
-// 签名算法与查询接口相同：x-token=AES(xk_pathname_ts_nonce)，x-sign=MD5(x-token_ts_nonce_jsessionid)
+// 注意：autoLogin 的 x-token 用 TOK_KEY(bAIgvwAuA4tbDr9d) 加密，不是查询接口的 REQ1_KEY，
+// 否则服务端解不出 token → 950202，会话每 24 小时过期后无法自动续期。
+// x-sign=MD5(x-token_x-time_x-nonce_jsessionid)
 function resignHeaders(headers, url, xk, jsid) {
   const ts = Date.now();
   const nonce = randomDigits(8);
@@ -653,7 +657,7 @@ function resignHeaders(headers, url, xk, jsid) {
     if (/^(x-sign|x-nonce|x-time|x-token)$/i.test(k)) continue;
     out[k] = headers[k];
   }
-  const tokenEnc = cmEncrypt(`${xk}_${pathname}_${ts}_${nonce}`, REQ1_KEY, DEFAULT_IV);
+  const tokenEnc = cmEncrypt(`${xk}_${pathname}_${ts}_${nonce}`, TOK_KEY, DEFAULT_IV);
   out['x-token'] = tokenEnc;
   out['x-nonce'] = nonce;
   out['x-time'] = String(ts);
@@ -720,7 +724,7 @@ async function autoRefreshSession(ctx, proactive) {
         return true;
       }
       // 签名以外的错误（如未登录）换写法也没用，直接停
-      if (rc && rc !== '950102' && rc !== '-9999' && rc !== 'undecodable' && !/sign/i.test(rd)) break;
+      if (rc && rc !== '950102' && rc !== '950202' && rc !== '-9999' && rc !== 'undecodable' && !/sign|token|\u89e3\u5bc6/i.test(rd)) break;
     } catch (e) {
       tries.push({ v: v.n, err: String((e && e.message) || e).slice(0, 40) });
     }
