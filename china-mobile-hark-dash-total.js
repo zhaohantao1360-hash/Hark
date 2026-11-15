@@ -309,6 +309,8 @@ const REQ_KEY = { '2': 'bAIgvwAuA4tbDr9d', '12': 'V0dSUFZtS1NWRnJa', '14': 'tVkd
 const REQ_IV  = { '2': '9791027341711819', '12': 'UkdWMVpWTVVWaGVq', '14': 'VjFSQ1ZtVkQxRTlQ' };
 // 查询请求/响应的加解密（x-qen 固定为 '1'）
 const REQ1_KEY = 'foorettD7vcBawt3';
+// autoLogin 换会话用的 x-token 密钥：登录接口与查询接口不同（查询用 REQ1_KEY）
+const TOK_KEY = 'bAIgvwAuA4tbDr9d';
 const RESP1_KEY = 'UVic06tpXgMNiApm';
 const RESP2_KEY = 'GS7VelkJl5IT1uwQ';
 const RESP14_KEY = 'RYV0hCV1lV25KYVJ';
@@ -653,7 +655,7 @@ function resignHeaders(headers, url, xk, jsid) {
     if (/^(x-sign|x-nonce|x-time|x-token)$/i.test(k)) continue;
     out[k] = headers[k];
   }
-  const tokenEnc = cmEncrypt(`${xk}_${pathname}_${ts}_${nonce}`, REQ1_KEY, DEFAULT_IV);
+  const tokenEnc = cmEncrypt(`${xk}_${pathname}_${ts}_${nonce}`, TOK_KEY, DEFAULT_IV);
   out['x-token'] = tokenEnc;
   out['x-nonce'] = nonce;
   out['x-time'] = String(ts);
@@ -720,7 +722,7 @@ async function autoRefreshSession(ctx, proactive) {
         return true;
       }
       // 签名以外的错误（如未登录）换写法也没用，直接停
-      if (rc && rc !== '950102' && rc !== '-9999' && rc !== 'undecodable' && !/sign/i.test(rd)) break;
+      if (rc && rc !== '950102' && rc !== '950202' && rc !== '-9999' && rc !== 'undecodable' && !/sign|token|\u89e3\u5bc6/i.test(rd)) break;
     } catch (e) {
       tries.push({ v: v.n, err: String((e && e.message) || e).slice(0, 40) });
     }
