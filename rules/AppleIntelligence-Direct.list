@@ -1,9 +1,0 @@
-#!name=Apple Intelligence Direct
-#!desc=Siri 核心域名，直连真实 IP（Apple 智能分流规则的直连部分，与 AppleIntelligence.list 配合使用，须放在其前面）
-#!author=zhaohantao1360-hash
-#!date=2026-11-15
-
-DOMAIN,guzzoni.apple.com
-DOMAIN-SUFFIX,smoot.apple.com
-DOMAIN,api-siri-prod.apple.com
-DOMAIN,seed.siri.apple.com
