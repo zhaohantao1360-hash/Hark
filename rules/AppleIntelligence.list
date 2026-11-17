@@ -1,0 +1,31 @@
+#!name=Apple Intelligence
+#!desc=Apple 智能（Siri、私有云计算、Apple Intelligence）分流规则，含 Private Relay 中继域名，不含 App Store 下载域名
+#!author=zhaohantao1360-hash
+#!date=2026-11-14
+
+DOMAIN,guzzoni.apple.com
+DOMAIN-SUFFIX,smoot.apple.com
+DOMAIN,api-siri-prod.apple.com
+DOMAIN,seed.siri.apple.com
+DOMAIN,apple-relay.apple.com
+DOMAIN,apple-relay.cloudflare.com
+DOMAIN,apple-relay.fastly-edge.com
+DOMAIN,cp4.cloudflare.com
+DOMAIN,apple-relay.mask.apple-dns.net
+DOMAIN,mask-api.icloud.com
+DOMAIN,mask-api.fe2.apple-dns.net
+DOMAIN,apple-relay.akamaized.net
+DOMAIN,apple-carry-relay.cloudflare.com
+DOMAIN,gspe1-ssl.ls.apple.com
+DOMAIN,gateway.icloud.com
+DOMAIN,probe.icloud.com
+DOMAIN,metrics.icloud.com
+DOMAIN,wps.apple.com
+DOMAIN-SUFFIX,pcc.apple.com
+DOMAIN-SUFFIX,apple-intelligence.com
+DOMAIN-SUFFIX,api-apple-intelligence.com
+DOMAIN-SUFFIX,issuer.apple.com
+DOMAIN,ropes.apple.com
+DOMAIN,mask.icloud.com
+DOMAIN,mask-h2.icloud.com
+DOMAIN-SUFFIX,app.apple.com

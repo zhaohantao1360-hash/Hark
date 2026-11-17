@@ -1,0 +1,27 @@
+# 屏蔽 iOS 系统更新（Egern 模块）
+# 来源：ddgksf2013/Filter 的 BlockiOSUpdate.list，由 Surge DOMAIN 规则转换而来，请勿手动编辑。
+# 上游文件：https://raw.githubusercontent.com/ddgksf2013/Filter/refs/heads/master/BlockiOSUpdate.list
+# 上游创建于 2025-12-21；iOS 27 可用（更新检查机制未换域名）。
+# 转换对照：Surge DOMAIN -> domain；策略统一 REJECT。
+# 注意：只拦更新检查与下载（4 个苹果更新服务器域名），不影响 App Store
+# （应用下载走 appldnld.apple.com，不在内），也不删已下载的更新包；
+# 只在代理开着时生效；与苹果 AI 规则（AppleIntelligence.list 26 条 +
+# AppleIntelligence-Direct.list 4 条）零重叠，无冲突。
+name: 屏蔽iOS系统更新
+description: 屏蔽 iOS 系统更新检查与下载：拦截苹果更新服务器域名。由 ddgksf2013/Filter 的 BlockiOSUpdate.list 转换而来，iOS 27 可用，不影响 App Store 与苹果 AI 分流。
+author: ddgksf2013（原版规则）；转换：Muse
+homepage: https://github.com/ddgksf2013/Filter
+
+rules:
+  - domain:
+      match: gdmf.apple.com
+      policy: REJECT
+  - domain:
+      match: mesu.apple.com
+      policy: REJECT
+  - domain:
+      match: updates-http.cdn-apple.com
+      policy: REJECT
+  - domain:
+      match: xp.apple.com
+      policy: REJECT
