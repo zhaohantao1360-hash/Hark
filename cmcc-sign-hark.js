@@ -766,7 +766,13 @@ function bjSaveSession(ctx, url) {
 function appCookieStr(ctx) {
   let kv = {};
   try { kv = (ctx.storage.getJSON(KEY.app) || {}).kv || {}; } catch (_) {}
-  try { const w = ctx.storage.get('cm_cookie'); if (w) kv = { ...normCookie(w), ...kv }; } catch (_) {}
+  // 小组件每 20 分钟保活并自动续期，它存的 cm_cookie 才是最新会话；
+  // 本模块自己抓的 Cookie 只在打开 App 时更新，续期后 JSESSIONID 已作废 → 410000「一段时间内未操作」。
+  // 所以小组件的 Cookie 覆盖本模块的同名字段（UID/ticketID 等小组件没有的字段保留）。
+  try {
+    const w = normCookie(ctx.storage.get('cm_cookie') || '');
+    if (w.JSESSIONID) kv = { ...kv, ...w };
+  } catch (_) {}
   return Object.entries(kv).map(([k, v]) => `${k}=${v}`).join('; ');
 }
 function randDigits(n) { let s = ''; for (let i = 0; i < n; i++) s += Math.floor(Math.random() * 10); return s; }
