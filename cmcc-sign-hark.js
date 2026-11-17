@@ -783,6 +783,12 @@ async function fetchBigToken(ctx, phone) {
   const params = JSON.parse(decAny(br.enc, '', String(br.xqen || '').trim()) || '{}');
   const cookie = appCookieStr(ctx);
   const jsid = (cookie.match(/JSESSIONID=([^;]+)/) || [])[1] || 'null';
+  try {
+    let a = {}; try { a = ctx.storage.getJSON(KEY.app) || {}; } catch (_) {}
+    const w = normCookie(ctx.storage.get('cm_cookie') || '');
+    const ageH = (t) => t ? ((Date.now() - Number(t)) / 3600000).toFixed(1) + 'h' : 'none';
+    await diag(ctx, `SRC appKv=${!!(a.kv && a.kv.JSESSIONID)} appAge=${ageH(a.ts)} appJs=${String((a.kv || {}).JSESSIONID || '').slice(-6)} widget=${!!w.JSESSIONID} widgetJs=${String(w.JSESSIONID || '').slice(-6)} widgetLogin=${ageH(ctx.storage.get('cm_login_ts'))} renewOk=${ageH(ctx.storage.get('cm_renew_ok_ts'))} bigReqAge=${ageH(br.ts)} sign=${!!br.sign} used=${jsid.slice(-6)}`);
+  } catch (_) {}
   const tries = [
     // 2026-10-22 真机验证：client.app.coc + 原 t 可用；app.10086.cn 该路径 404
     { host: 'client.app.coc.10086.cn', t: 'orig' }, { host: 'client.app.coc.10086.cn', t: 'cookie' }, { host: 'raw' },
