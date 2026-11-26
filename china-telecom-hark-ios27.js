@@ -1219,7 +1219,7 @@ function dropColumn(kind, d, label, numSize, dropW, dropH, uid) {
         direction: 'row',
         alignItems: 'center',
         gap: 4,
-        padding: [3, 9],
+        padding: [2, 8],
         borderRadius: 99,
         backgroundColor: c.pill,
         children: [
@@ -1235,7 +1235,7 @@ function divider(h) {
   return { type: 'stack', width: 1, height: h || 120, backgroundColor: '#DCE3EE', children: [] };
 }
 
-function headerRow(title, ds, fromCache, cookieDead) {
+function headerRow(title, ds, fromCache, cookieDead, compact) {
   const timeStr = ds && ds.updatedAt ? fmtTime(ds.updatedAt) : '--';
   const statusStr = cookieDead
     ? '登录失效，点我重登'
@@ -1246,7 +1246,7 @@ function headerRow(title, ds, fromCache, cookieDead) {
     alignItems: 'center',
     gap: 4,
     children: [
-      {
+      ...(compact ? [t(title, 16, 'bold', TELECOM, { minScale: 0.8 })] : [{
         type: 'stack',
         direction: 'column',
         alignItems: 'start',
@@ -1256,7 +1256,7 @@ function headerRow(title, ds, fromCache, cookieDead) {
           t(title, 16, 'bold', TELECOM, { minScale: 0.8 }),
           t('CHINA TELECOM', 6, 'semibold', TELECOM, { minScale: 0.8 }),
         ],
-      },
+      }]),
       { type: 'spacer' },
       t(statusStr, 9, 'regular', cookieDead ? WARN : SUB, { minScale: 1 }),
       { type: 'image', src: 'sf-symbol:cellularbars', width: 17, height: 12, color: TELECOM },
@@ -1345,12 +1345,12 @@ function buildMedium(title, ds, fromCache, ctx, cookieDead) {
   else foot.push(ins.forecast.text);
   return {
     type: 'widget',
-    padding: [10, 14],
-    gap: 6,
+    padding: [8, 14],
+    gap: 4,
     backgroundGradient: bg(),
     refreshAfter: refresh30(),
     children: [
-      headerRow(title, ds, fromCache, cookieDead),
+      headerRow(title, ds, fromCache, cookieDead, true),
       {
         type: 'stack',
         direction: 'row',
@@ -1358,11 +1358,11 @@ function buildMedium(title, ds, fromCache, ctx, cookieDead) {
         gap: 2,
         flex: 1,
         children: [
-          dropColumn('fee', feeData, '剩余话费', 21, 62, 72, 'm1'),
-          divider(104),
-          dropColumn('flow', ds.generalFlow, '剩余流量', 21, 62, 72, 'm2'),
-          divider(104),
-          dropColumn('voice', ds.voice, '剩余语音', 21, 62, 72, 'm3'),
+          dropColumn('fee', feeData, '剩余话费', 20, 58, 68, 'm1'),
+          divider(100),
+          dropColumn('flow', ds.generalFlow, '剩余流量', 20, 58, 68, 'm2'),
+          divider(100),
+          dropColumn('voice', ds.voice, '剩余语音', 20, 58, 68, 'm3'),
         ],
       },
       t(foot.join(' · '), 9, 'medium', SUB, { minScale: 0.65 }),

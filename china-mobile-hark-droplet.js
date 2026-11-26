@@ -1156,7 +1156,7 @@ function dropColumn(kind, d, label, numSize, dropW, dropH, uid) {
         direction: 'row',
         alignItems: 'center',
         gap: 4,
-        padding: [3, 9],
+        padding: [2, 8],
         borderRadius: 99,
         backgroundColor: c.pill,
         children: [
@@ -1172,7 +1172,7 @@ function divider(h) {
   return { type: 'stack', width: 1, height: h || 120, backgroundColor: '#DCE3EE', children: [] };
 }
 
-function headerRow(title, ds, fromCache) {
+function headerRow(title, ds, fromCache, compact) {
   const timeStr = ds && ds.updatedAt ? fmtTime(ds.updatedAt) : '--';
   return {
     type: 'stack',
@@ -1180,7 +1180,7 @@ function headerRow(title, ds, fromCache) {
     alignItems: 'center',
     gap: 4,
     children: [
-      {
+      ...(compact ? [t(title, 16, 'bold', CM_BLUE, { minScale: 0.8 })] : [{
         type: 'stack',
         direction: 'column',
         alignItems: 'start',
@@ -1190,7 +1190,7 @@ function headerRow(title, ds, fromCache) {
           t(title, 16, 'bold', CM_BLUE, { minScale: 0.8 }),
           t('CHINA MOBILE', 6, 'semibold', CM_BLUE, { minScale: 0.8 }),
         ],
-      },
+      }]),
       { type: 'spacer' },
       t(`${fromCache ? '缓存 · ' : ''}${timeStr}`, 9, 'regular', SUB, { minScale: 1 }),
       { type: 'image', src: 'sf-symbol:cellularbars', width: 17, height: 12, color: CM_BLUE },
@@ -1277,12 +1277,12 @@ function buildMedium(title, ds, fromCache, ctx) {
   else foot.push(ins.forecast.text);
   return {
     type: 'widget',
-    padding: [10, 14],
-    gap: 6,
+    padding: [8, 14],
+    gap: 4,
     backgroundGradient: bg(),
     refreshAfter: refresh30(),
     children: [
-      headerRow(title, ds, fromCache),
+      headerRow(title, ds, fromCache, true),
       {
         type: 'stack',
         direction: 'row',
@@ -1290,11 +1290,11 @@ function buildMedium(title, ds, fromCache, ctx) {
         gap: 2,
         flex: 1,
         children: [
-          dropColumn('fee', feeData, '剩余话费', 21, 62, 72, 'm1'),
-          divider(104),
-          dropColumn('flow', ds.flow, '剩余流量', 21, 62, 72, 'm2'),
-          divider(104),
-          dropColumn('voice', ds.voice, '剩余语音', 21, 62, 72, 'm3'),
+          dropColumn('fee', feeData, '剩余话费', 20, 58, 68, 'm1'),
+          divider(100),
+          dropColumn('flow', ds.flow, '剩余流量', 20, 58, 68, 'm2'),
+          divider(100),
+          dropColumn('voice', ds.voice, '剩余语音', 20, 58, 68, 'm3'),
         ],
       },
       t(foot.join(' · '), 9, 'medium', SUB, { minScale: 0.65 }),

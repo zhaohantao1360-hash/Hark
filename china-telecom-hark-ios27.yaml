@@ -41,13 +41,13 @@ scriptings:
   # 小组件脚本（generic 类型）
   - generic:
       name: "china-telecom-hark-ios27"
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-telecom-hark-ios27.js?v=20261126-1345"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-telecom-hark-ios27.js?v=20261126-1400"
       timeout: 20
   # 设备绑定 AndroidID 自动捕获（http_response 类型，Safari 完成短信绑定后自动存入本地存储，免手动复制填写）
   - http_response:
       name: "中国电信设备绑定捕获-Hark水滴版"
       match: '^https://telecom\.nufe\.ccwu\.cc/api/login'
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-telecom-hark-ios27.js?v=20261126-1345"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-telecom-hark-ios27.js?v=20261126-1400"
       body_required: true
       timeout: 10
   # 登录捕获（http_request 类型，与小组件是同一个文件，脚本内部按 ctx.request 自动分支）
@@ -56,14 +56,14 @@ scriptings:
   - http_request:
       name: "中国电信登录捕获-Hark水滴版"
       match: '^https://e\.dlife\.cn/'
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-telecom-hark-ios27.js?v=20261126-1345"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-telecom-hark-ios27.js?v=20261126-1400"
       timeout: 10
   # 定时保活（schedule 类型，同一个文件；无 widgetFamily 时脚本只拉接口续 session 不渲染）
   # 每 4 小时跑一次，配合滑动续期让登录态一直有效；CT_KEEPALIVE=false 可关闭
   - schedule:
       name: "中国电信保活-Hark水滴版"
       cron: "0 */4 * * *"
-      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-telecom-hark-ios27.js?v=20261126-1345"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-telecom-hark-ios27.js?v=20261126-1400"
       timeout: 20
 
 widgets:
