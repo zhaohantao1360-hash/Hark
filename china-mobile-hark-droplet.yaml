@@ -1,0 +1,87 @@
+name: "中国移动（Hark 水滴版）"
+description: "桌面/锁屏小组件：三颗水滴显示剩余话费、剩余流量、剩余语音，水位即剩余占比，顶部中国移动 + 5G。数据与登录逻辑与 ios27 版完全一致，只换了水滴渲染。先在「中国移动」App 用短信验证码登录一次自动捕获参数"
+icon: "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/ce/b7/2c/ceb72c6e-21c3-0c8b-a960-2fb8a547279f/AppIcon-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg"
+author: "Hark（水滴版改版）"
+
+# Egern 模块设置页自动生成的开关/输入框（模块级 env，优先级最高）
+env_schema:
+  CM_CAPTURE:
+    name: "抓取登录信息"
+    description: "打开「中国移动」App 时自动更新登录信息。关掉后不再抓取，登录过期也不会自动恢复"
+    default_value: "true"
+    options: ["true", "false"]
+  CM_CAPTURE_NOTIFY:
+    name: "每次抓取都通知"
+    description: "默认关：只在第一次抓到或登录过期恢复时通知"
+    default_value: "false"
+    options: ["true", "false"]
+  CM_PHONENUMBER:
+    name: "手机号（必填）"
+    description: "11 位移动手机号"
+  CM_SHOW_USED_FLOW:
+    name: "显示已用流量"
+    description: "打开后流量水滴显示已用而非剩余"
+    default_value: "false"
+    options: ["true", "false"]
+  CM_TITLE:
+    name: "小组件标题"
+    description: "默认「中国移动」"
+  CM_DEBUG:
+    name: "显示调试信息"
+    description: "打开后小组件底部显示调试信息，排查用"
+    default_value: "false"
+    options: ["true", "false"]
+
+# 需要解密中国移动 App 的 HTTPS 流量：Egern 设置里安装并信任 CA，
+# 再到 iOS「设置→通用→关于本机→证书信任设置」里打开信任
+mitm:
+  hostnames:
+    includes:
+      - client.app.coc.10086.cn
+      - 10086.online-cmcc.cn
+
+scriptings:
+  # 小组件脚本（generic）
+  - generic:
+      name: "china-mobile-hark-droplet"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-droplet.js?v=20261126-1300"
+      timeout: 20
+      env:
+        CM_PHONENUMBER: ""           # 必填：11 位移动手机号
+        # CM_SHOW_USED_FLOW: "false" # 'true' 显示已用流量
+        # CM_TITLE: "中国移动"        # 小组件标题
+        # CM_DEBUG: "false"          # 'true' 显示调试信息
+
+  # 会话保活：每 20 分钟后台查询一次，避免长时间不操作被移动注销登录
+  - schedule:
+      name: "中国移动保活-Hark水滴版"
+      cron: "*/20 * * * *"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-droplet.js?v=20261126-1300"
+      timeout: 90
+      env:
+        CM_KEEPALIVE: "true"
+        CM_PHONENUMBER: ""           # 与上面保持一致（留空则用小组件已保存的号码）
+
+  # 登录参数捕获：在「中国移动」App 用短信验证码登录一次（建议关闭指纹/面容登录），看到通知即成功
+  - http_request:
+      name: "中国移动登录捕获-Hark水滴版"
+      match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-droplet.js?v=20261126-1300"
+      body_required: true
+      timeout: 10
+      env:
+        CM_CAPTURE: "true"           # 抓取开关：false = 不再抓取（已登录好后可关，过期需再打开）
+        CM_CAPTURE_NOTIFY: "false"   # true = 每次抓到都通知；默认只在首次/过期恢复时通知
+
+  # Cookie 刷新：从登录响应抓 Set-Cookie，保持会话有效
+  - http_response:
+      name: "中国移动Cookie捕获-Hark水滴版"
+      match: '^https?:\/\/(client\.app\.coc\.10086\.cn|10086\.online-cmcc\.cn)(:\d+)?\/'
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-droplet.js?v=20261126-1300"
+      timeout: 10
+      env:
+        CM_CAPTURE: "true"           # 抓取开关：false = 不再抓取（已登录好后可关，过期需再打开）
+        CM_CAPTURE_NOTIFY: "false"   # true = 每次抓到都通知；默认只在首次/过期恢复时通知
+
+widgets:
+  - name: "china-mobile-hark-droplet"
