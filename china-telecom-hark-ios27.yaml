@@ -1,0 +1,72 @@
+name: "中国电信（Hark 水滴版）"
+description: "桌面/锁屏小组件：三颗水滴显示剩余话费、剩余流量、剩余语音，水位即剩余占比，顶部中国电信 + 5G。数据与登录逻辑沿用 SIJULY/egern-radar 的 china-telecom.js"
+author: "Hark（水滴版改版；数据层：SIJULY/egern-radar）"
+
+# Egern 模块设置页自动生成的开关/输入框（模块级 env，优先级最高）
+env_schema:
+  CT_APP_PHONE:
+    name: "App 手机号"
+    description: "11 位电信手机号，配服务密码 + AndroidID 后走 App 登录链（优先）"
+  CT_APP_PASSWORD:
+    name: "App 服务密码"
+    description: "电信服务密码（非短信验证码）"
+  CT_APP_ANDROID_ID:
+    name: "App AndroidID"
+    description: "16 位设备 ID（可留空：在 Safari 打开 https://telecom.nufe.ccwu.cc 短信绑定后 Egern 会自动捕获保存，也可手动填写）"
+  CT_SHOW_DIRECT:
+    name: "显示定向流量"
+    description: "关闭后中尺寸不显示定向（大尺寸也不显示）；不设置则按是否有定向数据自动判断"
+    options: ["true", "false"]
+  CT_SHOW_USED_FLOW:
+    name: "显示已用流量"
+    description: "打开后流量水滴显示已用而非剩余"
+    options: ["true", "false"]
+  CT_KEEPALIVE:
+    name: "定时保活"
+    description: "模块自带每 4 小时保活任务，定期拉接口续 session 防 cookie 过期；设为 false 可关闭"
+    default_value: "true"
+    options: ["true", "false"]
+  CT_TITLE:
+    name: "小组件标题"
+    description: "默认「中国电信」"
+
+# 捕获登录请求与设备绑定需要解密对应域名的 HTTPS 流量（需信任 Egern 证书）
+mitm:
+  hostnames:
+    includes:
+      - e.dlife.cn
+      - telecom.nufe.ccwu.cc
+
+scriptings:
+  # 小组件脚本（generic 类型）
+  - generic:
+      name: "china-telecom-hark-ios27"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-telecom-hark-ios27.js?v=20261126-1230"
+      timeout: 20
+  # 设备绑定 AndroidID 自动捕获（http_response 类型，Safari 完成短信绑定后自动存入本地存储，免手动复制填写）
+  - http_response:
+      name: "中国电信设备绑定捕获-Hark水滴版"
+      match: '^https://telecom\.nufe\.ccwu\.cc/api/login'
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-telecom-hark-ios27.js?v=20261126-1230"
+      body_required: true
+      timeout: 10
+  # 登录捕获（http_request 类型，与小组件是同一个文件，脚本内部按 ctx.request 自动分支）
+  # Safari 里登录 e.dlife.cn 成功后，直接从登录后的真实请求里抓 Cookie 存入存储，
+  # 小组件优先用抓到的 Cookie，全程无需手动操作
+  - http_request:
+      name: "中国电信登录捕获-Hark水滴版"
+      match: '^https://e\.dlife\.cn/'
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-telecom-hark-ios27.js?v=20261126-1230"
+      timeout: 10
+  # 定时保活（schedule 类型，同一个文件；无 widgetFamily 时脚本只拉接口续 session 不渲染）
+  # 每 4 小时跑一次，配合滑动续期让登录态一直有效；CT_KEEPALIVE=false 可关闭
+  - schedule:
+      name: "中国电信保活-Hark水滴版"
+      cron: "0 */4 * * *"
+      script_url: "https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-telecom-hark-ios27.js?v=20261126-1230"
+      timeout: 20
+
+widgets:
+  # 小组件在 iOS「编辑小组件」列表里显示为「中国电信」，通过 script_name 关联 generic 脚本
+  - name: "中国电信"
+    script_name: "china-telecom-hark-ios27"

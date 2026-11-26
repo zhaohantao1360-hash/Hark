@@ -5,6 +5,7 @@
 | 组件 | 模块（YAML） | 说明 |
 | --- | --- | --- |
 | 中国移动 · 仪表盘版（推荐） | [`china-mobile-hark-dash.yaml`](https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-mobile-hark-dash.yaml) | 话费、流量、语音仪表 + 7 天用量 + 月底预测 |
+| 中国电信 · 水滴版 | [`china-telecom-hark-ios27.yaml`](https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/china-telecom-hark-ios27.yaml) | 三颗水滴：剩余话费 / 流量 / 语音，水位即剩余占比 |
 | 订阅流量 · v2（推荐） | [`sub-traffic-hark-v2.yaml`](https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/sub-traffic-hark-v2.yaml) | 最多 4 个机场订阅的剩余流量、预测、到期 |
 | 油价 | [`GasPrice-hark.yaml`](https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/GasPrice-hark.yaml) | 92/95/98/柴油、调价倒计时、下轮预测、加满花费 |
 | 彩票开奖 | [`Lottery-hark.yaml`](https://raw.githubusercontent.com/zhaohantao1360-hash/Hark/main/Lottery-hark.yaml) | 7 种彩票开奖、冷热走势、参考号（仅供娱乐） |
