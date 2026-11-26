@@ -1200,7 +1200,7 @@ function dropColumn(kind, d, label, numSize, dropW, dropH, uid) {
     type: 'stack',
     direction: 'column',
     alignItems: 'center',
-    gap: 3,
+    gap: 2,
     flex: 1,
     children: [
       { type: 'image', src: dropletSvg(kind, data.percent, uid), width: dropW, height: dropH },
@@ -1219,12 +1219,12 @@ function dropColumn(kind, d, label, numSize, dropW, dropH, uid) {
         direction: 'row',
         alignItems: 'center',
         gap: 4,
-        padding: [4, 10],
+        padding: [3, 9],
         borderRadius: 99,
         backgroundColor: c.pill,
         children: [
           { type: 'text', text: '●', font: { size: 8 }, textColor: c.dot, maxLines: 1 },
-          t(label, 11, 'semibold', NAVY, { minScale: 0.8 }),
+          t(label, 10, 'semibold', NAVY, { minScale: 0.8 }),
         ],
       },
     ],
@@ -1251,9 +1251,10 @@ function headerRow(title, ds, fromCache, cookieDead) {
         direction: 'column',
         alignItems: 'start',
         gap: 0,
+        width: 92,
         children: [
-          t(title, 17, 'bold', TELECOM, { minScale: 0.8 }),
-          t('CHINA TELECOM', 7, 'semibold', TELECOM, { minScale: 0.8 }),
+          t(title, 16, 'bold', TELECOM, { minScale: 0.8 }),
+          t('CHINA TELECOM', 6, 'semibold', TELECOM, { minScale: 0.8 }),
         ],
       },
       { type: 'spacer' },
@@ -1338,14 +1339,14 @@ function buildMedium(title, ds, fromCache, ctx, cookieDead) {
   const foot = [
     `更新 ${ds.updatedAt ? fmtTime(ds.updatedAt) : '--'}`,
     `今日 ${fmtMB(ins.todayMB)}`,
-    `本月剩 ${ins.daysLeft} 天`,
-    ins.forecast.text,
+    `剩 ${ins.daysLeft} 天`,
   ];
   if (showDir && ds.directFlow) foot.splice(1, 0, `定向 ${ds.directFlow.number}${ds.directFlow.unit || ''}`);
+  else foot.push(ins.forecast.text);
   return {
     type: 'widget',
-    padding: [14, 16],
-    gap: 8,
+    padding: [10, 14],
+    gap: 6,
     backgroundGradient: bg(),
     refreshAfter: refresh30(),
     children: [
@@ -1357,11 +1358,11 @@ function buildMedium(title, ds, fromCache, ctx, cookieDead) {
         gap: 2,
         flex: 1,
         children: [
-          dropColumn('fee', feeData, '剩余话费', 24, 74, 86, 'm1'),
-          divider(118),
-          dropColumn('flow', ds.generalFlow, '剩余流量', 24, 74, 86, 'm2'),
-          divider(118),
-          dropColumn('voice', ds.voice, '剩余语音', 24, 74, 86, 'm3'),
+          dropColumn('fee', feeData, '剩余话费', 21, 62, 72, 'm1'),
+          divider(104),
+          dropColumn('flow', ds.generalFlow, '剩余流量', 21, 62, 72, 'm2'),
+          divider(104),
+          dropColumn('voice', ds.voice, '剩余语音', 21, 62, 72, 'm3'),
         ],
       },
       t(foot.join(' · '), 9, 'medium', SUB, { minScale: 0.65 }),
@@ -1386,8 +1387,8 @@ function buildLarge(title, ds, fromCache, ctx, cookieDead) {
   cols.push(dropColumn('voice', ds.voice, '剩余语音', 26, 82, 95, 'l3'));
   return {
     type: 'widget',
-    padding: [14, 16],
-    gap: 8,
+    padding: [10, 14],
+    gap: 6,
     backgroundGradient: bg(),
     refreshAfter: refresh30(),
     children: [
